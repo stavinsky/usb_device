@@ -138,7 +138,7 @@ reg [7:0] bytes_in [0:63];
 reg [7:0] bytes_out [0:63];
 reg [6:0] bytes_out_number = 0;
 wire start_trans_probe ;
-assign clk_tst = data_strobe;
+assign clk_tst = success;
 assign clk_tst1 = data_toggle;
 localparam 
     st_idle = 0,
@@ -161,7 +161,7 @@ localparam
     hs_stall = 2'b11;
 reg data_strobe_loc = 0;
 reg transaction_loc = 0;
-
+reg [6:0] usb_addr_temp = 0;
 always @(posedge clk48mhz ) begin
     data_strobe_loc <= data_strobe;
     transaction_loc <= transaction_active;
@@ -169,8 +169,7 @@ always @(posedge clk48mhz ) begin
     case (status)
         st_idle: begin 
             if (transaction_active && !transaction_loc) begin
-                data_toggle <= 0;
-                
+                // data_toggle <= 0;
                 status <= st_start_transaction;
                 if (!direction_in) begin 
                     bytes_counter <= 0;
@@ -179,11 +178,13 @@ always @(posedge clk48mhz ) begin
             end
         end
         st_start_transaction: begin
-            
+            if (usb_addr_temp >0 ) begin 
+                usb_address <= usb_addr_temp;
+                usb_addr_temp <= 0; 
+            end 
             if (!direction_in) begin
                 if (success) begin 
                     status <= st_success_transaction;
-                    
                 end 
                 if (data_strobe && !data_strobe_loc) begin 
                         
@@ -203,8 +204,6 @@ always @(posedge clk48mhz ) begin
                 end else begin
                     status <= st_success_transaction;
                     data_in_valid <= 1'b0;
-                    r_ledrow[1] <= 1;
-                    status <= st_success_transaction;
                     data_toggle <= 0;
                     
                 end
@@ -213,8 +212,14 @@ always @(posedge clk48mhz ) begin
 
         end
         st_success_transaction: begin
+            data_toggle <= 0;
+            if (setup && bytes_counter > 0 && bytes_in[1] == 8'h05) begin // set status
+                r_ledrow[1] <= 1; 
+                data_toggle <= 1;
+                usb_addr_temp <= bytes_in[2][6:0];
+            end
             
-            if (setup && bytes_counter > 0 && bytes_in[1] == 8'h06) begin
+            if (setup && bytes_counter > 0 && bytes_in[1] == 8'h06) begin // get descriptor
                 
                 // start_trans_probe <= 1;
                 r_ledrow[0] <= 1;
@@ -254,7 +259,7 @@ always @(posedge clk48mhz ) begin
         
     endcase
         
-    if (!rst) begin
+    if (!rst || usb_rst) begin
         // r_ledrow <= 5'b0; 
         r_ledrow <= 5'b00000; 
         uart_counter <= 0;
@@ -262,6 +267,7 @@ always @(posedge clk48mhz ) begin
         status <= st_idle;
         usb_address <= 0; 
         handshake <= hs_ack; 
+        data_toggle <= 0;
         // start_trans_probe = 0;
 
     end
