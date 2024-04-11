@@ -1,6 +1,6 @@
 `include "usbcorev/usb.v"
 `include "rpll.v"
-`include "uart_tx.v"
+// `include "uart_tx.v"
 module pll48MHz_module (
     input clk27mhz,
     output clk48mhz,
@@ -79,8 +79,8 @@ reg usb_dn_sync;
 
 always @(posedge clk48mhz) begin
     if (!usb_tx_en) begin
-        usb_dp_sync <= usb_dp;
-        usb_dn_sync <= usb_dn;
+        usb_dp_sync <= 1'b1 ? usb_dp : 1'bz;
+        usb_dn_sync <=  1'b1 ? usb_dn : 1'bz;;
     end
 
     
@@ -123,7 +123,8 @@ usb usb0(
 
     .tx_se0(usb_tx_se0),
     .tx_j(usb_tx_j),
-    .tx_en(usb_tx_en));
+    .tx_en(usb_tx_en)
+);
 
 
 
@@ -136,9 +137,9 @@ reg [6:0] bytes_out_counter = 0;
 reg [7:0] bytes_in [0:63];
 reg [7:0] bytes_out [0:63];
 reg [6:0] bytes_out_number = 0;
-reg start_trans_probe = 0;
+wire start_trans_probe ;
 assign clk_tst = data_strobe;
-assign clk_tst1 = start_trans_probe;
+assign clk_tst1 = data_toggle;
 localparam 
     st_idle = 0,
     st_setup_get_status = 1,
@@ -164,18 +165,17 @@ reg transaction_loc = 0;
 always @(posedge clk48mhz ) begin
     data_strobe_loc <= data_strobe;
     transaction_loc <= transaction_active;
-    if (start_trans_probe == 1) start_trans_probe <= 0;
-    if (data_toggle) begin
-        data_toggle <= 0;
-    end
-    // if (handshake == hs_ack) begin
-    //     handshake <= hs_none;
-    // end
+
     case (status)
         st_idle: begin 
             if (transaction_active && !transaction_loc) begin
-                status = st_start_transaction;
-                bytes_counter <= 0;
+                data_toggle <= 0;
+                
+                status <= st_start_transaction;
+                if (!direction_in) begin 
+                    bytes_counter <= 0;
+
+                end
             end
         end
         st_start_transaction: begin
@@ -183,47 +183,66 @@ always @(posedge clk48mhz ) begin
             if (!direction_in) begin
                 if (success) begin 
                     status <= st_success_transaction;
+                    
                 end 
                 if (data_strobe && !data_strobe_loc) begin 
+                        
                         bytes_counter <= bytes_counter + 1 ;
                         bytes_in[bytes_counter] <= data_out;
-                        
                 end
         
             end
             else begin
-                // if (bytes_counter < expected_bytes) begin
-                //     if (bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
-                //         data_in <= bytes_in[0];
-                //         bytes_counter <= bytes_counter + 1;
-                //         data_toggle <= 1'b1;
-                //         data_in_valid = 1'b1;
-                //     end
-                // end else begin
-                //     status <= st_success_transaction;
-                //     data_in_valid = 1'b0;
-                // end
+                if (bytes_counter <= expected_bytes) begin
+                    if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
+                        data_toggle <= 1'b1;
+                        data_in_valid <= 1'b1;
+                        data_in <= bytes_in[bytes_counter];
+                        bytes_counter <= bytes_counter + 1;
+                    end
+                end else begin
+                    status <= st_success_transaction;
+                    data_in_valid <= 1'b0;
+                    r_ledrow[1] <= 1;
+                    status <= st_success_transaction;
+                    data_toggle <= 0;
+                    
+                end
 
             end
 
         end
         st_success_transaction: begin
             
-
             if (setup && bytes_counter > 0 && bytes_in[1] == 8'h06) begin
-                handshake <= hs_ack; 
-                start_trans_probe <= 1;
-                // data_in_valid <= 0; 
-                // data_toggle <= 1;
-                r_ledrow[0] <= 1;
                 
-                // expected_bytes <= 18;
+                // start_trans_probe <= 1;
+                r_ledrow[0] <= 1;
+                bytes_counter <= 0; 
+                expected_bytes <= 20;
                 // bytes_in[0:17] <= {8'h12, 8'h01, 8'h02, 8'h00, 8'hff, 8'hff, 8'hff, 8'h40, 8'h05, 8'h06, 8'h07, 8'h08, 8'h02, 8'h00, 8'h01, 8'h02, 8'h03, 8'h01}; 
+                bytes_in[0] <= 8'h12; 
+                bytes_in[1] <= 8'h01; 
+                bytes_in[2] <= 8'h02; 
+                bytes_in[3] <= 8'h00; 
+                bytes_in[4] <= 8'hff; 
+                bytes_in[5] <= 8'hff; 
+                bytes_in[6] <= 8'hff; 
+                bytes_in[7] <= 8'h40; 
+                bytes_in[8] <= 8'h05;
+                bytes_in[9] <= 8'h06;
+                bytes_in[10] <= 8'h07; 
+                bytes_in[11] <= 8'h08; 
+                bytes_in[12] <= 8'h02; 
+                bytes_in[13] <= 8'h00; 
+                bytes_in[14] <= 8'h01; 
+                bytes_in[15] <= 8'h02; 
+                bytes_in[16] <= 8'h03;
+                bytes_in[17] <= 8'h01;
+                // data_toggle <= 1; 
                 
 
-            end else begin
-                handshake <= hs_none;
-            end
+            end 
 
             status <= st_idle;
         end
@@ -232,6 +251,7 @@ always @(posedge clk48mhz ) begin
             status <= st_idle;
 
         end
+        
     endcase
         
     if (!rst) begin
@@ -240,6 +260,8 @@ always @(posedge clk48mhz ) begin
         uart_counter <= 0;
         bytes_out_counter <= 0;
         status <= st_idle;
+        usb_address <= 0; 
+        handshake <= hs_ack; 
         // start_trans_probe = 0;
 
     end

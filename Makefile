@@ -9,7 +9,7 @@ PNR=/Users/stavinsky/build/nextpnr/build/nextpnr-himbaechel
 .DEFAULT_GOAL := build/pack.fs
 
 build/build.json: $(SYNTH_SRCS)
-	yosys -p 'read_verilog $(SYNTH_SRCS); synth_gowin -json $@'
+	yosys -p 'read_verilog $(SYNTH_SRCS) ; synth_gowin -json $@'
 
 build/pnr_build.json: build/build.json $(PINS)
 	$(PNR) \
