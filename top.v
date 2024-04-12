@@ -234,8 +234,8 @@ always @(posedge clk48mhz ) begin
                                 start_trans_probe <= 1;
                                 bytes_in[0] <= 8'h12; 
                                 bytes_in[1] <= 8'h01; 
-                                bytes_in[2] <= 8'h02; 
-                                bytes_in[3] <= 8'h00; 
+                                bytes_in[2] <= 8'h00; 
+                                bytes_in[3] <= 8'h02; 
                                 bytes_in[4] <= 8'hff; 
                                 bytes_in[5] <= 8'hff; 
                                 bytes_in[6] <= 8'hff; 
@@ -261,7 +261,7 @@ always @(posedge clk48mhz ) begin
                                 bytes_in[3] <= 8'h00; // total length
                                 bytes_in[4] <= 8'h01; // number of interfaces 
                                 bytes_in[5] <= 8'hbc; // bConfigurationValue
-                                bytes_in[6] <= 8'had; //  iConfiguration	Index of String Descriptor describing this configuration
+                                bytes_in[6] <= 8'h00; //  iConfiguration	Index of String Descriptor describing this configuration
                                 bytes_in[7] <= 8'b11000000; //bmAttributes  
                                 bytes_in[8] <= 8'h09; // bMaxPower in units 2ma per unit
                                 bytes_counter <= 0;
