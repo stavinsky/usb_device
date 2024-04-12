@@ -224,17 +224,17 @@ always @(posedge clk48mhz ) begin
                                         bytes_counter <= 0;
                                         expected_bytes <= 4; 
                                     end
-                                    8'haa: begin
+                                    8'haa: begin // manufacturer
                                         config_offset <= 31;
                                         bytes_counter <= 0;
                                         expected_bytes <= 26; 
                                     end
-                                    8'hab: begin
+                                    8'hab: begin // device name
                                         config_offset <= 57;
                                         bytes_counter <= 0;
                                         expected_bytes <= 28; 
                                     end
-                                    8'hac: begin
+                                    8'hac: begin // serial number
                                         config_offset <= 31;
                                         bytes_counter <= 0;
                                         expected_bytes <= 26; 

@@ -24,7 +24,7 @@ AC // 	iSerialNumber
 00 // total length
 01 // number of interfaces 
 01 // bConfigurationValue
-55 //  iConfiguration	Index of String Descriptor describing this configuration
+00 //  iConfiguration	Index of String Descriptor describing this configuration
 c0 //bmAttributes  
 09 // bMaxPower in units 2ma per unit
         // string descriptor offset=27
