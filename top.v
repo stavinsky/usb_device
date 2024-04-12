@@ -23,9 +23,10 @@ pll48MHz_module usb_clk(
     .clk_locked(clk_locked)
 );
 
-
+reg [6:0]config_offset = 0;
+reg [7:0] configuration [0:127];
 initial begin
-    
+   $readmemh("constants.txt", configuration ); 
 end
 reg [4:0]r_ledrow = 5'b00000;
 assign ledrow = ~r_ledrow;
@@ -106,7 +107,7 @@ reg [7:0] got_bytes = 0;
 reg [6:0] bytes_out_counter = 0;
 reg [7:0] bytes_in [0:128];
 reg start_trans_probe = 1;
-assign clk_tst = start_trans_probe;
+assign clk_tst = direction_in;
 assign clk_tst1 = data_toggle;
 localparam 
     st_idle = 0,
@@ -171,17 +172,20 @@ always @(posedge clk48mhz ) begin
             else begin
                 if (success) begin 
                     status <= st_success_transaction;
+                    data_in_valid <= 1'b0;
+                    expected_bytes <= 0;
                 end 
                 if (bytes_counter <= expected_bytes) begin
                     if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
                         data_toggle <= 1'b1;
                         data_in_valid <= 1'b1;
-                        data_in <= bytes_in[bytes_counter];
+                        data_in <= configuration[config_offset + bytes_counter[6:0]];
                         bytes_counter <= bytes_counter + 1;
                     end
                 end else begin
-                    status <= st_success_transaction;
-                    data_in_valid <= 1'b0;
+                    // status <= st_success_transaction;
+                    data_in_valid <= 1'b0; 
+                    expected_bytes <= 0;
                     
                 end
 
@@ -190,58 +194,40 @@ always @(posedge clk48mhz ) begin
         end
         st_success_transaction: begin
             start_trans_probe <= 0;
-            if (setup && got_bytes > 0) begin
+            if (setup && got_bytes == 8 && !direction_in) begin
+                
                 case (bytes_in[1])
                     8'h05: begin //set address
                         r_ledrow[1] <= 1; 
                         usb_addr_temp <= bytes_in[2][6:0];
+                        // expected_bytes <= 0;
                     end 
                     8'h06: begin // get  descriptor
+                        
                         case (bytes_in[3])
                             8'h01: begin //get device descriptor
-                                
+                                config_offset <= 0; 
                                 start_trans_probe <= 1;
-                                bytes_in[0] <= 8'h12; 
-                                bytes_in[1] <= 8'h01; 
-                                bytes_in[2] <= 8'h00; 
-                                bytes_in[3] <= 8'h02; 
-                                bytes_in[4] <= 8'hff; 
-                                bytes_in[5] <= 8'hff; 
-                                bytes_in[6] <= 8'hff; 
-                                bytes_in[7] <= 8'h40; 
-                                bytes_in[8] <= 8'h05;
-                                bytes_in[9] <= 8'h06;
-                                bytes_in[10] <= 8'h07; 
-                                bytes_in[11] <= 8'h08; 
-                                bytes_in[12] <= 8'h02; 
-                                bytes_in[13] <= 8'h00; 
-                                bytes_in[14] <= 8'hAA; // iManufacturer 
-                                bytes_in[15] <= 8'hAB; // iProduct
-                                bytes_in[16] <= 8'hAC;  // 	iSerialNumber
-                                bytes_in[17] <= 8'h01;  // num configurations
                                 r_ledrow[0] <= 1;
                                 bytes_counter <= 0;      
                                 expected_bytes <= bytes_in[6]; 
+
                             end
                             8'h02: begin // get configuration descriptor
-                                bytes_in[0] <= 8'h09; // length
-                                bytes_in[1] <= 8'h02; // descriptor id 
-                                bytes_in[2] <= 8'h09; // total length
-                                bytes_in[3] <= 8'h00; // total length
-                                bytes_in[4] <= 8'h01; // number of interfaces 
-                                bytes_in[5] <= 8'hbc; // bConfigurationValue
-                                bytes_in[6] <= 8'h00; //  iConfiguration	Index of String Descriptor describing this configuration
-                                bytes_in[7] <= 8'b11000000; //bmAttributes  
-                                bytes_in[8] <= 8'h09; // bMaxPower in units 2ma per unit
+                                config_offset <= 18; 
                                 bytes_counter <= 0;
-                                expected_bytes <= bytes_in[6];
                                 r_ledrow[2] <= 1;
+                                expected_bytes <= bytes_in[6];
+                            end
+                            default: begin
+                                
                             end
                         endcase
 
                     end
                     default: begin
                         start_trans_probe <= 0;
+                        
                     end 
                 endcase
             end 
