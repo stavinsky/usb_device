@@ -100,9 +100,9 @@ usb usb0(
 assign usb_dp = usb_tx_en? (usb_tx_se0? 1'b0: usb_tx_j): 1'bz;
 assign usb_dn = usb_tx_en? (usb_tx_se0? 1'b0: !usb_tx_j): 1'bz;
 
-reg [6:0] bytes_counter = 0;
+reg [7:0] bytes_counter = 0;
 reg [7:0] uart_counter = 0;
-reg [6:0] got_bytes = 0;
+reg [7:0] got_bytes = 0;
 reg [6:0] bytes_out_counter = 0;
 reg [7:0] bytes_in [0:128];
 reg start_trans_probe = 1;
@@ -120,7 +120,7 @@ localparam
     st_do_nothing = 254;
 
 reg [7:0] status = st_idle;
-reg [6:0] expected_bytes = 0;
+reg [7:0] expected_bytes = 0;
 
 localparam
     hs_ack = 2'b00,

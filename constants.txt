@@ -1,0 +1,29 @@
+// device descriptor
+12 // bLength
+01 // bDescriptorType
+00 // bcdUSB
+02 // bDeviceClass
+ff // bDeviceSubClass
+ff // bDeviceProtocol
+ff // bMaxPacketSize
+40 // idVendor
+05 // idProduct
+06 // bcdDevice
+07 //iManufacturer
+08 // iProduct
+02 // iSerialNumber 
+01 // bNumConfigurations
+AA // iManufacturer 
+AB // iProduct
+AC // 	iSerialNumber
+01 // num configurations
+// device first configuration descriptor offset = 18
+09 // length
+02 // descriptor id 
+09 // total length
+00 // total length
+01 // number of interfaces 
+bc // bConfigurationValue
+00 //  iConfiguration	Index of String Descriptor describing this configuration
+c0 //bmAttributes  
+09; // bMaxPower in units 2ma per unit
