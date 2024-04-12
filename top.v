@@ -173,7 +173,6 @@ always @(posedge clk48mhz ) begin
                 if (success) begin 
                     status <= st_success_transaction;
                     data_in_valid <= 1'b0;
-                    expected_bytes <= 0;
                 end 
                 if (bytes_counter <= expected_bytes) begin
                     if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
@@ -185,7 +184,6 @@ always @(posedge clk48mhz ) begin
                 end else begin
                     // status <= st_success_transaction;
                     data_in_valid <= 1'b0; 
-                    expected_bytes <= 0;
                     
                 end
 
@@ -219,15 +217,43 @@ always @(posedge clk48mhz ) begin
                                 r_ledrow[2] <= 1;
                                 expected_bytes <= bytes_in[6];
                             end
+                            8'h03: begin
+                                case (bytes_in[2])
+                                    8'h00: begin
+                                        config_offset <= 27;
+                                        bytes_counter <= 0;
+                                        expected_bytes <= 4; 
+                                    end
+                                    8'haa: begin
+                                        config_offset <= 31;
+                                        bytes_counter <= 0;
+                                        expected_bytes <= 26; 
+                                    end
+                                    8'hab: begin
+                                        config_offset <= 57;
+                                        bytes_counter <= 0;
+                                        expected_bytes <= 28; 
+                                    end
+                                    8'hac: begin
+                                        config_offset <= 31;
+                                        bytes_counter <= 0;
+                                        expected_bytes <= 26; 
+                                    end
+                                    default: begin
+                                        expected_bytes <= 0;
+                                    end
+                                endcase
+                            end
                             default: begin
                                 
+                                expected_bytes <= 0;
                             end
                         endcase
 
                     end
                     default: begin
                         start_trans_probe <= 0;
-                        
+                        expected_bytes <= 0;
                     end 
                 endcase
             end 

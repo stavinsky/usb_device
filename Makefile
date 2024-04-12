@@ -9,7 +9,7 @@ PNR=/Users/stavinsky/build/nextpnr/build/nextpnr-himbaechel
 .DEFAULT_GOAL := build/pack.fs
 
 build/build.json: $(SYNTH_SRCS)
-	yosys -q -p  'read_verilog -sv $(SYNTH_SRCS) ; synth_gowin -json $@'
+	yosys -q -p  'read_verilog  $(SYNTH_SRCS) ; synth_gowin -json $@'
 
 build/pnr_build.json: build/build.json $(PINS)
 	$(PNR) \
@@ -20,7 +20,8 @@ build/pnr_build.json: build/build.json $(PINS)
       	--vopt family=GW1N-9C \
 		--freq 48000000 \
 		--placer-heap-cell-placement-timeout 8 \
-		--threads `nproc`
+		--threads `nproc` \
+		--randomize-seed
 
 
 build/pack.fs: build/pnr_build.json
