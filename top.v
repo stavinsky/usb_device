@@ -97,7 +97,7 @@ reg [7:0] bytes_in [0:128];
 // assign clk_tst1 = data_in_valid;
 // assign probe_3 = data_toggle ;
 reg [2:0] control_point;
-assign {clk_tst, clk_tst1, probe_3} = control_point;
+assign {clk_tst, clk_tst1, probe_3} = status[2:0];
 
 
 localparam 
@@ -150,6 +150,9 @@ always @(posedge clk48mhz ) begin
             if (setup && got_bytes >= 7 && !direction_in) begin
                     control_point <= 1; 
                 case (bytes_in[1])
+                    8'h30: begin
+                       r_ledrow = bytes_in[2][4:0];
+                    end
                     8'h05: begin //set address
                         r_ledrow[1] <= 1; 
                         usb_addr_temp <= bytes_in[2][6:0];
@@ -174,28 +177,28 @@ always @(posedge clk48mhz ) begin
                             end
                             8'h03: begin
                                 case (bytes_in[2])
-                                    8'h00: begin
-                                        config_offset <= 36;
+                                    8'h00: begin //string configuration 
+                                        config_offset <= 43;
                                         bytes_counter <= 0;
                                         expected_bytes <= 4; 
                                     end
                                     8'haa: begin // manufacturer
-                                        config_offset <= 40;
+                                        config_offset <= 47;
                                         bytes_counter <= 0;
                                         expected_bytes <= 26; 
                                     end
                                     8'hab: begin // device name
-                                        config_offset <= 66;
+                                        config_offset <= 73;
                                         bytes_counter <= 0;
                                         expected_bytes <= 28; 
                                     end
                                     8'hac: begin // serial number
-                                        config_offset <= 40;
+                                        config_offset <= 47;
                                         bytes_counter <= 0;
                                         expected_bytes <= 26; 
                                     end
-                                    8'had: begin // serial number
-                                        config_offset <= 94;
+                                    8'had: begin // interface 0 str
+                                        config_offset <= 101;
                                         bytes_counter <= 0;
                                         expected_bytes <= 36; 
                                     end

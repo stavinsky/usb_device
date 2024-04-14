@@ -20,7 +20,7 @@ AC // 	iSerialNumber
 //                                         device first configuration descriptor offset = 18
 09 // length
 02 // descriptor id 
-12 // total length
+19 // total length
 00 // total length
 01 // number of interfaces 
 01 // bConfigurationValue
@@ -32,21 +32,29 @@ c0 //bmAttributes
 04 // bDescriptorType
 00 // bInterfaceNumber
 00 // bAlternateSetting
-00 // bNumEndpoints
+01 // bNumEndpoints
 00 // bInterfaceClass
 ff // bInterfaceSubClass
 ff // bInterfaceProtocol
 ad //  iInterface (string index for interface)
-//                                         string descriptor offset= 27 + 9 = 36
+//                                      interface 0 configuration 0 endpoint 0 in control mode offset = 27 + 9 = 36
+07 // bLength 
+05 // bDescriptorType 
+01 // bEndpointAddress
+00 // bmAttributes
+40 // wMaxPacketSize
+00 // wMaxPacketSize
+00 // bInterval
+//                                         string descriptor offset= 36 + 7 = 43
 04 // bLength
 0x03 // bDescriptorType
 09 // wLANGID[0]
 04 // wLANGID[0]
-       // Manufacturer string offset 36 +4  40  it is unicode little endian
+       // Manufacturer string offset 43 + 4  47  it is unicode little endian
 1a 03 41 00 6e 00 74 00 6f 00 6e 00 27 00 73 00 20 00 43 00 6f 00 72 00 70 00
-        // device string offst 40 + 26 = 66
+        // device string offst 47 + 26 = 73
 1c 03 41 00 6e 00 74 00 6f 00 6e 00 27 00 73 00 44 00 65 00 76 00 69 00 63 00 65 00
-        // interface string offset = 66 + 94
+        // interface string offset = 73 + 28 = 101
 24 03 41 00 6e 00 74 00 6f 00 6e 00 27 00 73 00 20 00 69 00 6e 00 74 00 65 00 72 00 66 00 61 00 63 00 65 00
 00
 00

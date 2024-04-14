@@ -21,7 +21,7 @@ build/pnr_build.json: build/build.json $(PINS)
 		--freq 48000000 \
 		--placer-heap-cell-placement-timeout 8 \
 		--threads `nproc` \
-		--randomize-seed
+	    --randomize-seed
 
 
 build/pack.fs: build/pnr_build.json
