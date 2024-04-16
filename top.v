@@ -1,4 +1,6 @@
 `include "usbcorev/usb.v"
+`include "queue.v"
+`include "uart_tx.v"
 
 
 module top(
@@ -16,7 +18,53 @@ module top(
 wire clk48mhz;
 wire clk_locked;
 
+
+reg uart_dir;
+reg [7:0] uart_data_in;
+wire uart_busy;
+wire uart_done;
+uart_tx uart_tx0 (
+    .i_Clock(clk48mhz),
+    .i_Tx_DV(uart_dir),
+    .i_Tx_Byte(uart_data_in),
+    .o_Tx_Active(uart_busy),
+    .o_Tx_Serial(clk_tst),
+    .o_Tx_Done(uart_done)
+);
+
+reg r_uart_done;
+always @(posedge clk48mhz ) begin
+    r_uart_done <= uart_done;
+    if (uart_dir) uart_dir <= 0; 
+    if (q_read_success) q_read_success <= 0;
+
+    if (!q_empty && ~uart_busy) begin
+        uart_data_in <= q_data_out;
+        uart_dir <= 1;
+        q_read_success <= 1;
+    end
+end
+
 assign usb_dp_pull = rst;
+reg q_empty;
+reg [7:0] q_data_in;
+reg [7:0] q_data_out;
+reg q_read_success;
+reg q_data_in_ready;
+
+queue queue1(
+    .empty(q_empty),
+    .data_in(q_data_in),
+    .data_out(q_data_out),
+    .read_success(q_read_success),
+    .dir(q_data_in_ready),
+    .clk(clk48mhz),
+    .rst(rst)
+
+);
+always @(posedge clk48mhz ) begin
+    
+end
 
 pll48MHz_module usb_clk(
     .clk27mhz(clk27mhz),
@@ -51,7 +99,7 @@ reg usb_dn_sync;
 always @(posedge clk48mhz) begin
     if (!usb_tx_en) begin
         usb_dp_sync <= 1'b1 ? usb_dp : 1'bz;
-        usb_dn_sync <=  1'b1 ? usb_dn : 1'bz;;
+        usb_dn_sync <=  1'b1 ? usb_dn : 1'bz;
     end
 
     
@@ -94,10 +142,9 @@ reg [7:0] got_bytes = 0;
 reg [6:0] bytes_out_counter = 0;
 reg [7:0] bytes_in [0:128];
 // assign clk_tst = transaction_active ;
-// assign clk_tst1 = data_in_valid;
-// assign probe_3 = data_toggle ;
-reg [2:0] control_point;
-assign {clk_tst, clk_tst1, probe_3} = status[2:0];
+assign clk_tst1 = success;
+assign probe_3 = data_strobe ;
+// assign {clk_tst, clk_tst1, probe_3} = status[2:0];
 
 
 localparam 
@@ -106,9 +153,8 @@ localparam
     st_prepare_response = 2,
     st_send_data = 3,
     st_wait_host = 4,
-    st_data_out_finish = 5,
-    st_start_transaction = 6,
-    st_success_transaction = 7,
+    st_read_bulk = 5,
+
     st_do_nothing = 254;
 
 reg [7:0] status = st_idle;
@@ -122,33 +168,55 @@ localparam
 reg data_strobe_loc = 0;
 reg transaction_loc = 0;
 reg [6:0] usb_addr_temp = 0;
+reg endpoint02_data_out = 0;
 always @(posedge clk48mhz ) begin
+    
     data_strobe_loc <= data_strobe;
     transaction_loc <= transaction_active;
-    if (control_point>0) control_point = 0;
 
     case (status)
         st_idle: begin 
-            if (transaction_active && !transaction_loc) begin
+            if (setup && transaction_active && !transaction_loc) begin
                 status <= st_get_data_from_host;
                 // got_bytes <= 0;
+            end 
+            else if (endpoint == 4'h02 && !direction_in && transaction_active && !transaction_loc) begin
+                data_toggle <= endpoint02_data_out;
+                endpoint02_data_out <= ~endpoint02_data_out;
+                status <= st_read_bulk;
+                
+            end
+
+
+        end
+        st_read_bulk: begin
+            if (success) begin 
+                status <= st_idle;
+            end 
+            if (data_strobe && !data_strobe_loc) begin     
+                q_data_in <= data_out;
+                q_data_in_ready <= 1;
+            end 
+            else begin 
+                q_data_in_ready <= 0; 
             end
         end
-
         st_get_data_from_host: begin
             if (success) begin 
                 status <= st_prepare_response;
             end 
+            
             if (data_strobe && !data_strobe_loc) begin 
                     
                     got_bytes <= got_bytes + 1 ;
                     bytes_in[got_bytes] <= data_out;
             end
 
+
+
         end
         st_prepare_response: begin
             if (setup && got_bytes >= 7 && !direction_in) begin
-                    control_point <= 1; 
                 case (bytes_in[1])
                     8'h30: begin
                        r_ledrow = bytes_in[2][4:0];
@@ -158,10 +226,8 @@ always @(posedge clk48mhz ) begin
                         usb_addr_temp <= bytes_in[2][6:0];
                         expected_bytes <= 0;
                         // bytes_counter <= 0;
-                        control_point <= 2;
                     end 
                     8'h06: begin // get  descriptor
-                       control_point <= 3; 
                         case (bytes_in[3])
                             8'h01: begin //get device descriptor
                                 config_offset <= 0; 
@@ -275,6 +341,7 @@ always @(posedge clk48mhz ) begin
         handshake <= hs_ack; 
         data_toggle <= 0;
         got_bytes <= 0;
+        endpoint02_data_out <= 0;
 
     end
 

@@ -40,8 +40,8 @@ ad //  iInterface (string index for interface)
 //                                      interface 0 configuration 0 endpoint 0 in control mode offset = 27 + 9 = 36
 07 // bLength 
 05 // bDescriptorType 
-01 // bEndpointAddress
-00 // bmAttributes
+02 // bEndpointAddress
+02 // bmAttributes
 40 // wMaxPacketSize
 00 // wMaxPacketSize
 00 // bInterval
