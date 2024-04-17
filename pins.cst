@@ -1,25 +1,38 @@
 IO_LOC "clk27mhz" 52;
+IO_PORT "clk27mhz" IO_TYPE=LVCMOS33;
 IO_LOC "ledrow[0]" 10;
+IO_PORT "ledrow[0]" IO_TYPE=LVCMOS33;
 IO_LOC "ledrow[1]" 11;
+IO_PORT "ledrow[1]" IO_TYPE=LVCMOS33;
 IO_LOC "ledrow[2]" 13;
+IO_PORT "ledrow[2]" IO_TYPE=LVCMOS33;
 IO_LOC "ledrow[3]" 14;
+IO_PORT "ledrow[3]" IO_TYPE=LVCMOS33;
 IO_LOC "ledrow[4]" 15;
-IO_LOC "led" 16;
+IO_PORT "ledrow[4]" IO_TYPE=LVCMOS33;
+//IO_LOC "led" 16;
 IO_LOC "button" 3;
+IO_PORT "button" IO_TYPE=LVCMOS33;
 IO_LOC "rst" 4;
+IO_PORT "rst" IO_TYPE=LVCMOS33;
 
-// IO_LOC "elvds_p" 71;
-// IO_PORT "elvds_p" IO_TYPE=LVCMOS33;
-// IO_LOC "elvds_n" 70;
-// IO_PORT "elvds_n" IO_TYPE=LVCMOS33;
 
-IO_LOC "probe_3" 77;
-IO_PORT "probe_3" IO_TYPE=LVCMOS33 ;
-IO_LOC "clk_tst" 70;
-IO_PORT "clk_tst" IO_TYPE=LVCMOS33;
+IO_LOC "probe1" 32;
+IO_PORT "probe1" IO_TYPE=LVCMOS33;
+IO_LOC "probe2" 31;
+IO_PORT "probe2" IO_TYPE=LVCMOS33;
+IO_LOC "probe3" 49;
+IO_PORT "probe3" IO_TYPE=LVCMOS33;
 
-IO_LOC "clk_tst1" 71;
-IO_PORT "clk_tst1" IO_TYPE=LVCMOS33;
+IO_LOC "probe_code[0]" 70;
+IO_PORT "probe_code[0]" IO_TYPE=LVCMOS33;
+IO_LOC "probe_code[1]" 71;
+IO_PORT "probe_code[1]" IO_TYPE=LVCMOS33;
+IO_LOC "probe_code[2]" 72;
+IO_PORT "probe_code[2]" IO_TYPE=LVCMOS33;
+
+IO_LOC "uart" 48;
+IO_PORT "uart" IO_TYPE=LVCMOS33;
 
 // true LVDS pins
 IO_LOC "usb_dp" 25;
@@ -28,7 +41,7 @@ IO_LOC "usb_dn" 26;
 IO_PORT "usb_dn" IO_TYPE=LVCMOS33 PULL_MODE=NONE;
 
 
-
+CLOCK_LOC "clk48mhz" BUFG = CLK;
 
 IO_LOC "usb_dp_pull" 27;
 IO_PORT "usb_dp_pull" IO_TYPE=LVCMOS33 PULL_MODE=UP;

@@ -75,17 +75,17 @@ module usb_clk_recovery(
 reg[1:0] cntr;
 reg prev_i;
 
-assign strobe = cntr == 1'b0;
+assign strobe = cntr == 2'b0;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        cntr <= 1'b0;
+        cntr <= 2'b0;
         prev_i <= 1'b0;
     end else begin
         if (i == prev_i) begin
             cntr <= cntr - 1'b1;
         end else begin
-            cntr <= 1'b1;
+            cntr <= 2'b1;
         end
         prev_i <= i;
     end
@@ -129,7 +129,7 @@ assign sync = (data == 7'b0101010 && !j && !se0);
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        data <= 1'd0;
+        data <= 7'd0;
     end else if (clken) begin
         data <= { data[5:0], j || se0 };
     end
@@ -147,7 +147,7 @@ module usb_reset_detect(
 localparam cntr_rst_val = 19'd480000;
 
 reg[18:0] cntr;
-assign usb_rst = cntr == 1'b0;
+assign usb_rst = cntr == 19'b0;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin

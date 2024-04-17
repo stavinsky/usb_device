@@ -20,7 +20,7 @@ reg[8:0] next_shift;
 
 always @(*) begin
     if (clear_shift)
-        next_shift = { 7'b1, din };
+        next_shift = { 8'b1, din };
     else
         next_shift = { shift_reg[7:0], din };
 end
@@ -66,8 +66,8 @@ always @(posedge clk or negedge rst_n) begin
         state <= st_idle;
         clear_shift <= 1'bx;
 
-        xpid <= 1'sbx;
-        xdata <= 1'sbx;
+        xpid <= 4'sbx;
+        xdata <= 8'sbx;
         xdatastrobe <= 1'b0;
         xcrc5_ok <= 1'b0;
         xcrc16_ok <= 1'b0;
@@ -158,11 +158,11 @@ multisample5 se0_filter(
     .out(se0));
 
 reg[2:0] short_idle_counter;
-assign short_idle = short_idle_counter == 1'b0;
+assign short_idle = short_idle_counter == 3'b0;
 always @(posedge clk_48) begin
     if (se0 || !j || xpacket)
         short_idle_counter <= 3'b111;
-    else if (short_idle_counter != 1'b0)
+    else if (short_idle_counter != 3'b0)
         short_idle_counter <= short_idle_counter - 1'b1;
 end
 

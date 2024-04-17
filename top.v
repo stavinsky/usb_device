@@ -10,9 +10,11 @@ module top(
     input rst,
     output usb_dp_pull,
     output [4:0]ledrow,
-    output clk_tst,
-    output clk_tst1, 
-    output probe_3
+    output probe1,
+    output probe2, 
+    output probe3,
+    output uart,
+    output [2:0]probe_code
 );
 
 wire clk48mhz;
@@ -28,7 +30,7 @@ uart_tx uart_tx0 (
     .i_Tx_DV(uart_dir),
     .i_Tx_Byte(uart_data_in),
     .o_Tx_Active(uart_busy),
-    .o_Tx_Serial(clk_tst),
+    .o_Tx_Serial(uart),
     .o_Tx_Done(uart_done)
 );
 
@@ -80,18 +82,20 @@ end
 reg [4:0]r_ledrow = 5'b00000;
 assign ledrow = ~r_ledrow;
 
-reg [6:0] usb_address;
+wire [6:0] usb_address;
+reg[6:0] r_usb_address;
+assign usb_address = r_usb_address;
 wire usb_rst; // set to 1 if usb device got reset from the host
 reg[3:0] endpoint;  
-reg transaction_active;
-reg direction_in;
-reg setup;
+wire transaction_active;
+wire direction_in;
+wire setup;
 reg data_toggle;
 reg [1:0] handshake;
 reg [7:0] data_in;
 reg [7:0] data_out;
 reg data_in_valid;
-reg data_strobe;
+wire data_strobe;
 reg success; // crc is valid
 reg usb_dp_sync;
 reg usb_dn_sync;
@@ -142,8 +146,9 @@ reg [7:0] got_bytes = 0;
 reg [6:0] bytes_out_counter = 0;
 reg [7:0] bytes_in [0:128];
 // assign clk_tst = transaction_active ;
-assign clk_tst1 = success;
-assign probe_3 = data_strobe ;
+assign probe1 = r_usb_address > 0;
+assign probe2 = data_toggle ;
+assign probe3 = success;
 // assign {clk_tst, clk_tst1, probe_3} = status[2:0];
 
 
@@ -169,16 +174,58 @@ reg data_strobe_loc = 0;
 reg transaction_loc = 0;
 reg [6:0] usb_addr_temp = 0;
 reg endpoint02_data_out = 0;
+reg endpoint00_data_in = 0;
+reg endpoint00_data_out = 0;
+localparam 
+    setup_stage_idle=0,
+    setup_stage_data=1,
+    setup_stage_status=2;
+reg [2:0] setup_stage =setup_stage_idle;
+
+reg [2:0] r_probe_code;
+assign probe_code = r_probe_code;
+reg setup_in = 0;
 always @(posedge clk48mhz ) begin
     
     data_strobe_loc <= data_strobe;
     transaction_loc <= transaction_active;
 
+
+    r_probe_code <= setup_stage;
     case (status)
+    
         st_idle: begin 
+            if (!transaction_active) begin
+                data_toggle <= 0;
+                if (setup_stage == setup_stage_status) begin
+                    setup_stage <= setup_stage_idle;
+                    r_usb_address <= usb_addr_temp;
+                end
+            end
             if (setup && transaction_active && !transaction_loc) begin
-                status <= st_get_data_from_host;
-                // got_bytes <= 0;
+                
+                case (setup_stage)
+                    setup_stage_idle: begin
+                        status <= st_get_data_from_host;
+                        data_toggle <= 0;
+                        got_bytes <= 0;
+
+                    end
+                    setup_stage_data: begin
+                        data_toggle <= ~data_toggle;
+                        if (direction_in) begin
+                            status <= st_send_data;
+                        end
+                        else begin
+                            status <= setup_stage_status;
+                        end
+                    end
+                    setup_stage_status: begin
+                        setup_stage <= setup_stage_idle;
+                        data_toggle <= 1;
+                        r_usb_address <= usb_addr_temp;
+                    end
+                endcase
             end 
             else if (endpoint == 4'h02 && !direction_in && transaction_active && !transaction_loc) begin
                 data_toggle <= endpoint02_data_out;
@@ -205,9 +252,7 @@ always @(posedge clk48mhz ) begin
             if (success) begin 
                 status <= st_prepare_response;
             end 
-            
             if (data_strobe && !data_strobe_loc) begin 
-                    
                     got_bytes <= got_bytes + 1 ;
                     bytes_in[got_bytes] <= data_out;
             end
@@ -216,7 +261,7 @@ always @(posedge clk48mhz ) begin
 
         end
         st_prepare_response: begin
-            if (setup && got_bytes >= 7 && !direction_in) begin
+            if (setup && got_bytes >= 7) begin
                 case (bytes_in[1])
                     8'h30: begin
                        r_ledrow = bytes_in[2][4:0];
@@ -287,41 +332,32 @@ always @(posedge clk48mhz ) begin
             end 
             else begin
             end
-
-            status <= st_send_data;
+            status <= st_idle;
+            setup_stage <= setup_stage_data;
         end
         st_send_data: begin
-            if (direction_in) begin
-                data_toggle <= 1;
-            end
-
-            if (success) begin 
-                status <= st_wait_host;
-                data_in_valid <= 1'b0;
-            end 
-            if (bytes_counter <= expected_bytes) begin
-                if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
-                    data_in_valid <= 1'b1;
-                    data_in <= configuration[config_offset + bytes_counter[6:0]];
-                    bytes_counter <= bytes_counter + 1;
+            if (transaction_active) begin
+                if (success) begin 
+                    status <= st_idle;
+                    data_in_valid <= 1'b0;
+                    setup_stage <= setup_stage_status;
+                end 
+                if (bytes_counter <= expected_bytes) begin
+                    if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
+                        data_in_valid <= 1'b1;
+                        data_in <= configuration[config_offset + bytes_counter[6:0]];
+                        bytes_counter <= bytes_counter + 1;
+                    end
+                end else begin
+                    data_in_valid <= 1'b0; 
+                    setup_stage <= setup_stage_status;
                 end
-            end else begin
-                data_in_valid <= 1'b0; 
-                // status <= st_wait_host;
+            end
+            else begin
+                status <= st_idle;
+                bytes_counter <= 0;
             end
         end 
-        st_wait_host: begin
-            data_toggle <= 0;
-            got_bytes <= 0;
-            if (usb_address == 0 && usb_addr_temp > 0) usb_address <= usb_addr_temp;
-            if (bytes_counter == 0 ) begin // nothing to wait for 
-                status <= st_idle;
-            end
-            if (!transaction_active ) begin
-                status <= st_idle;
-            end
-
-        end
 
         default: begin
             status <= st_idle;
@@ -336,12 +372,16 @@ always @(posedge clk48mhz ) begin
         uart_counter <= 0;
         bytes_out_counter <= 0;
         status <= st_idle;
-        usb_address <= 0; 
+        r_usb_address <= 0; 
         usb_addr_temp <= 0;
         handshake <= hs_ack; 
         data_toggle <= 0;
         got_bytes <= 0;
         endpoint02_data_out <= 0;
+        endpoint00_data_in <= 0;
+        endpoint00_data_out <= 0;
+        setup_stage <= setup_stage_idle;
+        setup_in <= 0;
 
     end
 

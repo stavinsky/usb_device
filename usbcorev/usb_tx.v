@@ -47,7 +47,7 @@ wire crc_out;
 wire d = dump_crc? !crc_out: tx_data[0];
 wire se0 = !bit_stuff && (state == st_eop1 || state == st_eop2);
 
-wire tx_data_empty = (tx_data[8:2] == 1'b0);
+wire tx_data_empty = (tx_data[8:2] == 7'b0);
 assign data_strobe = transmit && tx_data_empty && tx_strobe;
 
 always @(posedge clk_48 or negedge rst_n) begin
@@ -110,10 +110,10 @@ reg[2:0] bit_stuff_counter;
 assign bit_stuff = bit_stuff_counter == 3'd6;
 always @(posedge clk_48 or negedge rst_n) begin
     if (!rst_n) begin
-        bit_stuff_counter <= 1'b0;
+        bit_stuff_counter <= 3'b0;
     end else if (bit_strobe) begin
         if (state == st_idle || !d || bit_stuff || se0)
-            bit_stuff_counter <= 1'b0;
+            bit_stuff_counter <= 3'b0;
         else
             bit_stuff_counter <= bit_stuff_counter + 1'b1;
     end

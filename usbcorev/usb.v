@@ -130,7 +130,7 @@ localparam
 // 7.5 bits of inter-packet idle time. We allow at most 31 bits between
 // token activation and receiving the corresponding DATA packet.
 reg[6:0] token_timeout;
-wire token_active = token_timeout != 1'b0;
+wire token_active = token_timeout != 7'b0;
 
 reg[1:0] handshake_latch;
 
@@ -139,21 +139,21 @@ always @(posedge clk_48 or negedge rst_n) begin
         success <= 1'b0;
         state <= st_idle;
         data_strobe <= 1'b0;
-        endpoint <= 1'sbx;
+        endpoint <= 4'sbx;
         direction_in <= 1'bx;
         setup <= 1'bx;
         transaction_active <= 1'b0;
-        token_timeout <= 1'b0;
+        token_timeout <= 7'b0;
         tx_transmit <= 1'b0;
         
         tx_enable_crc16 <= 1'b0;
         handshake_latch <= 2'bxx;
     end else begin
-        if (token_timeout != 1'b0)
+        if (token_timeout != 7'b0)
             token_timeout <= token_timeout - 1'b1;
 
         if (!transaction_active) begin
-            endpoint <= 1'sbx;
+            endpoint <= 4'sbx;
             direction_in <= 1'bx;
             setup <= 1'bx;
             handshake_latch <= 2'bxx;
@@ -206,7 +206,7 @@ always @(posedge clk_48 or negedge rst_n) begin
                                 endcase
                             end else begin
                                 transaction_active <= 1'b0;
-                                endpoint <= 1'sbx;
+                                endpoint <= 4'sbx;
                                 direction_in <= 1'bx;
                                 setup <= 1'bx;
                             end
@@ -219,7 +219,7 @@ always @(posedge clk_48 or negedge rst_n) begin
                             end
                         end
                         default: begin
-                            endpoint <= 1'sbx;
+                            endpoint <= 4'sbx;
                             direction_in <= 1'bx;
                             setup <= 1'bx;
                         end
