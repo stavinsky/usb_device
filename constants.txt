@@ -47,7 +47,7 @@ ad //  iInterface (string index for interface)
 00 // bInterval
 //                                         string descriptor offset= 36 + 7 = 43
 04 // bLength
-0x03 // bDescriptorType
+03 // bDescriptorType
 09 // wLANGID[0]
 04 // wLANGID[0]
        // Manufacturer string offset 43 + 4  47  it is unicode little endian
