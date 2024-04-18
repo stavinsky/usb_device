@@ -42,6 +42,12 @@ IO_PORT "usb_dn" IO_TYPE=LVCMOS33 PULL_MODE=NONE;
 
 
 CLOCK_LOC "clk48mhz" BUFG = CLK;
+CLOCK_LOC "clk27mhz" BUFG = CLK;
 
 IO_LOC "usb_dp_pull" 27;
 IO_PORT "usb_dp_pull" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+
+INS_LOC "configuration_configuration_0_0_s" BSRAM_R10[6];
+INS_LOC "queue1/mem_mem_0_0_s" BSRAM_R10[3];
+INS_LOC "usb_clk/pll48mhz/rpll_inst" PLL_R;

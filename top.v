@@ -64,9 +64,7 @@ queue queue1(
     .rst(rst)
 
 );
-always @(posedge clk48mhz ) begin
-    
-end
+
 
 pll48MHz_module usb_clk(
     .clk27mhz(clk27mhz),
@@ -145,11 +143,10 @@ reg [7:0] uart_counter = 0;
 reg [7:0] got_bytes = 0;
 reg [6:0] bytes_out_counter = 0;
 reg [7:0] bytes_in [0:128];
-// assign clk_tst = transaction_active ;
-assign probe1 = r_usb_address > 0;
-assign probe2 = data_toggle ;
-assign probe3 = success;
-// assign {clk_tst, clk_tst1, probe_3} = status[2:0];
+// assign r_probe_code[2] = direction_in;
+// assign r_probe_code[1] =  setup;
+// assign r_probe_code[0] = transaction_active;
+assign {probe1, probe2, probe3} = status[2:0];
 
 
 localparam 
@@ -157,8 +154,8 @@ localparam
     st_get_data_from_host = 1,
     st_prepare_response = 2,
     st_send_data = 3,
-    st_wait_host = 4,
-    st_read_bulk = 5,
+    st_read_bulk = 4,
+    st_setup = 5,
 
     st_do_nothing = 254;
 
@@ -185,6 +182,7 @@ reg [2:0] setup_stage =setup_stage_idle;
 reg [2:0] r_probe_code;
 assign probe_code = r_probe_code;
 reg setup_in = 0;
+reg setup_toggle = 0;
 always @(posedge clk48mhz ) begin
     
     data_strobe_loc <= data_strobe;
@@ -195,45 +193,53 @@ always @(posedge clk48mhz ) begin
     case (status)
     
         st_idle: begin 
-            if (!transaction_active) begin
-                data_toggle <= 0;
-                if (setup_stage == setup_stage_status) begin
-                    setup_stage <= setup_stage_idle;
-                    r_usb_address <= usb_addr_temp;
+            if (transaction_active && !transaction_loc) begin
+                if (setup || setup_stage == setup_stage_data) begin
+                    status <= st_setup;
                 end
             end
-            if (setup && transaction_active && !transaction_loc) begin
-                
+            
+        end
+        st_setup: begin
+            if (transaction_active) begin 
                 case (setup_stage)
                     setup_stage_idle: begin
                         status <= st_get_data_from_host;
                         data_toggle <= 0;
                         got_bytes <= 0;
-
+                        setup_toggle <= 0;
                     end
                     setup_stage_data: begin
-                        data_toggle <= ~data_toggle;
-                        if (direction_in) begin
-                            status <= st_send_data;
+                        
+                        if (setup_in && direction_in) begin
+                            if (expected_bytes > 0) begin
+                                status <= st_send_data;
+                                bytes_counter <= 0;
+                                setup_toggle <= ~setup_toggle;
+                            end
+                        end 
+                        else if (setup_in && ~direction_in) begin
+                            setup_stage <= setup_stage_status;
+                            data_toggle <= 1;
                         end
-                        else begin
-                            status <= setup_stage_status;
+                        else if (~setup_in && direction_in) begin
+                            setup_stage <= setup_stage_status;
+                            data_toggle <= 1;
                         end
-                    end
-                    setup_stage_status: begin
-                        setup_stage <= setup_stage_idle;
-                        data_toggle <= 1;
-                        r_usb_address <= usb_addr_temp;
                     end
                 endcase
             end 
-            else if (endpoint == 4'h02 && !direction_in && transaction_active && !transaction_loc) begin
-                data_toggle <= endpoint02_data_out;
-                endpoint02_data_out <= ~endpoint02_data_out;
-                status <= st_read_bulk;
+            else if (setup_stage == setup_stage_status) begin
+                setup_stage <= setup_stage_idle;
+                status <= st_idle; 
+                r_usb_address <= usb_addr_temp;
                 
             end
-
+            else begin
+                if (handshake != hs_ack) handshake <= hs_ack;
+                status <= st_idle; 
+                setup_stage <= setup_stage_idle;
+            end 
 
         end
         st_read_bulk: begin
@@ -256,91 +262,78 @@ always @(posedge clk48mhz ) begin
                     got_bytes <= got_bytes + 1 ;
                     bytes_in[got_bytes] <= data_out;
             end
-
-
-
         end
         st_prepare_response: begin
-            if (setup && got_bytes >= 7) begin
-                case (bytes_in[1])
-                    8'h30: begin
-                       r_ledrow = bytes_in[2][4:0];
-                    end
-                    8'h05: begin //set address
-                        r_ledrow[1] <= 1; 
-                        usb_addr_temp <= bytes_in[2][6:0];
-                        expected_bytes <= 0;
-                        // bytes_counter <= 0;
-                    end 
-                    8'h06: begin // get  descriptor
-                        case (bytes_in[3])
-                            8'h01: begin //get device descriptor
-                                config_offset <= 0; 
-                                r_ledrow[0] <= 1;
-                                bytes_counter <= 0;      
-                                expected_bytes <= bytes_in[6]; 
-                            end
-                            8'h02: begin // get configuration descriptor
-                                config_offset <= 18; 
-                                bytes_counter <= 0;
-                                r_ledrow[2] <= 1;
-                                expected_bytes <= bytes_in[6];
-                            end
-                            8'h03: begin
-                                case (bytes_in[2])
-                                    8'h00: begin //string configuration 
-                                        config_offset <= 43;
-                                        bytes_counter <= 0;
-                                        expected_bytes <= 4; 
-                                    end
-                                    8'haa: begin // manufacturer
-                                        config_offset <= 47;
-                                        bytes_counter <= 0;
-                                        expected_bytes <= 26; 
-                                    end
-                                    8'hab: begin // device name
-                                        config_offset <= 73;
-                                        bytes_counter <= 0;
-                                        expected_bytes <= 28; 
-                                    end
-                                    8'hac: begin // serial number
-                                        config_offset <= 47;
-                                        bytes_counter <= 0;
-                                        expected_bytes <= 26; 
-                                    end
-                                    8'had: begin // interface 0 str
-                                        config_offset <= 101;
-                                        bytes_counter <= 0;
-                                        expected_bytes <= 36; 
-                                    end
-                                    default: begin
-                                        expected_bytes <= 0;
-                                    end
-                                endcase
-                            end
-                            default: begin
-                                expected_bytes <= 0;
-                            end
-                        endcase
-
-                    end
-                    default: begin
-                        expected_bytes <= 0;
-                        
-                    end 
-                endcase
-            end 
-            else begin
-            end
             status <= st_idle;
             setup_stage <= setup_stage_data;
-        end
+            setup_in <= bytes_in[0][7];
+            case (bytes_in[1])
+                8'h30: begin
+                    r_ledrow = bytes_in[2][4:0];
+                end
+                8'h05: begin //set address
+                    
+                    usb_addr_temp <= bytes_in[2][6:0];
+                    expected_bytes <= 0;
+                end 
+                8'h06: begin // get  descriptor
+                    case (bytes_in[3])
+                        8'h01: begin //get device descriptor
+                            config_offset <= 0; 
+                           r_ledrow[0] <= 1;
+                            bytes_counter <= 0;      
+                            expected_bytes <= bytes_in[6]; 
+                        end
+                        8'h02: begin // get configuration descriptor
+                            config_offset <= 18; 
+                            
+                            expected_bytes <= bytes_in[6];
+                        end
+                        8'h03: begin
+                            case (bytes_in[2])
+                                8'h00: begin //string configuration 
+                                    config_offset <= 43;
+                                    expected_bytes <= 4; 
+                                end
+                                8'haa: begin // manufacturer
+                                    config_offset <= 47;
+                                    expected_bytes <= 26; 
+                                end
+                                8'hab: begin // device name
+                                    config_offset <= 73;
+                                    expected_bytes <= 28; 
+                                end
+                                8'hac: begin // serial number
+                                    config_offset <= 47;
+                                    expected_bytes <= 26; 
+                                end
+                                8'had: begin // interface 0 str
+                                    config_offset <= 101;
+                                    expected_bytes <= 36; 
+                                end
+                                default: begin
+                                    expected_bytes <= 0;
+                                end
+                            endcase
+                        end
+                        default: begin
+                            expected_bytes <= 0;
+                            handshake <= hs_stall;
+                        end
+                    endcase
+
+                end
+                default: begin
+                    expected_bytes <= 0;
+                end 
+            endcase
+        end 
+
         st_send_data: begin
+            data_toggle <= setup_toggle;
             if (transaction_active) begin
                 if (success) begin 
                     status <= st_idle;
-                    data_in_valid <= 1'b0;
-                    setup_stage <= setup_stage_status;
                 end 
                 if (bytes_counter <= expected_bytes) begin
                     if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
@@ -350,20 +343,13 @@ always @(posedge clk48mhz ) begin
                     end
                 end else begin
                     data_in_valid <= 1'b0; 
-                    setup_stage <= setup_stage_status;
                 end
             end
             else begin
                 status <= st_idle;
-                bytes_counter <= 0;
             end
         end 
 
-        default: begin
-            status <= st_idle;
-
-        end
-        
     endcase
         
     if (!rst || usb_rst) begin
@@ -382,6 +368,8 @@ always @(posedge clk48mhz ) begin
         endpoint00_data_out <= 0;
         setup_stage <= setup_stage_idle;
         setup_in <= 0;
+        setup_toggle <= 0;
+
 
     end
 
