@@ -16,7 +16,7 @@ Gowin_rPLL pll48mhz (
     .fdiv(6'b0), 
     .idiv(6'b0)
 );
-	defparam pll48mhz.DEVICE = "GW1NR-9";
+	defparam pll48mhz.DEVICE = "GW1NR-9C";
 	defparam pll48mhz.FCLKIN = "27";
 	defparam pll48mhz.IDIV_SEL = 8;
 	defparam pll48mhz.FBDIV_SEL = 15;

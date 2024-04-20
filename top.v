@@ -1,8 +1,3 @@
-`include "usbcorev/usb.v"
-`include "queue.v"
-`include "uart_tx.v"
-
-
 module top(
     input clk27mhz,
     inout usb_dp,
@@ -21,7 +16,7 @@ wire clk48mhz;
 wire clk_locked;
 
 
-reg uart_dir;
+reg uart_dir=0;
 reg [7:0] uart_data_in;
 wire uart_busy;
 wire uart_done;
@@ -48,11 +43,11 @@ always @(posedge clk48mhz ) begin
 end
 
 assign usb_dp_pull = rst;
-reg q_empty;
-reg [7:0] q_data_in;
-reg [7:0] q_data_out;
+wire q_empty;
+reg [7:0] q_data_in = 8'h0;
+wire [7:0] q_data_out;
 reg q_read_success;
-reg q_data_in_ready;
+reg q_data_in_ready = 0;
 
 queue queue1(
     .empty(q_empty),
@@ -81,20 +76,20 @@ reg [4:0]r_ledrow = 5'b00000;
 assign ledrow = ~r_ledrow;
 
 wire [6:0] usb_address;
-reg[6:0] r_usb_address;
+reg[6:0] r_usb_address = 0;
 assign usb_address = r_usb_address;
 wire usb_rst; // set to 1 if usb device got reset from the host
-reg[3:0] endpoint;  
+wire [3:0] endpoint ;  
 wire transaction_active;
 wire direction_in;
 wire setup;
-reg data_toggle;
-reg [1:0] handshake;
-reg [7:0] data_in;
-reg [7:0] data_out;
-reg data_in_valid;
+reg data_toggle = 0;
+reg [1:0] handshake = 2'b00;
+reg [7:0] data_in = 8'h00;
+wire [7:0] data_out;
+reg data_in_valid = 0;
 wire data_strobe;
-reg success; // crc is valid
+wire success; // crc is valid
 reg usb_dp_sync;
 reg usb_dn_sync;
 
@@ -154,7 +149,6 @@ localparam
     st_get_data_from_host = 1,
     st_prepare_response = 2,
     st_send_data = 3,
-    st_read_bulk = 4,
     st_setup = 5,
 
     st_do_nothing = 254;
@@ -179,10 +173,41 @@ localparam
     setup_stage_status=2;
 reg [2:0] setup_stage =setup_stage_idle;
 
-reg [2:0] r_probe_code;
+reg [2:0] r_probe_code = 0;
 assign probe_code = r_probe_code;
 reg setup_in = 0;
 reg setup_toggle = 0;
+
+// always @(posedge clk48mhz) begin
+//     case(status)
+//         st_idle: begin
+//             if (transaction_active && !transaction_loc) begin
+//                 if (setup) begin
+//                     status <= st_get_setup_data;
+//                 end
+//             end
+//         end
+//         st_get_setup_data: begin
+//             if (success) begin 
+//                 status <= st_prepare_response;
+//             end 
+//             if (data_strobe && !data_strobe_loc) begin 
+//                     got_bytes <= got_bytes + 1 ;
+//                     bytes_in[got_bytes] <= data_out;
+//             end 
+//         end
+//         get_data: begin
+//         end
+//         send_data: begin
+//         end
+//         check_status: begin
+//         end
+
+//     endcase
+// end 
+// function [16:0] descriptor_offset();
+
+// endfunction
 always @(posedge clk48mhz ) begin
     
     data_strobe_loc <= data_strobe;
@@ -242,24 +267,12 @@ always @(posedge clk48mhz ) begin
             end 
 
         end
-        st_read_bulk: begin
-            if (success) begin 
-                status <= st_idle;
-            end 
-            if (data_strobe && !data_strobe_loc) begin     
-                q_data_in <= data_out;
-                q_data_in_ready <= 1;
-            end 
-            else begin 
-                q_data_in_ready <= 0; 
-            end
-        end
         st_get_data_from_host: begin
             if (success) begin 
                 status <= st_prepare_response;
             end 
             if (data_strobe && !data_strobe_loc) begin 
-                    got_bytes <= got_bytes + 1 ;
+                    got_bytes <= got_bytes + 1'h01 ;
                     bytes_in[got_bytes] <= data_out;
             end
         end
@@ -267,21 +280,16 @@ always @(posedge clk48mhz ) begin
             status <= st_idle;
             setup_stage <= setup_stage_data;
             setup_in <= bytes_in[0][7];
-            case (bytes_in[1])
-                8'h30: begin
-                    r_ledrow = bytes_in[2][4:0];
-                end
+            case (bytes_in[1]) // bRequest
                 8'h05: begin //set address
                     
                     usb_addr_temp <= bytes_in[2][6:0];
                     expected_bytes <= 0;
                 end 
                 8'h06: begin // get  descriptor
-                    case (bytes_in[3])
+                    case (bytes_in[3]) //wValue [1] 
                         8'h01: begin //get device descriptor
                             config_offset <= 0; 
-                           r_ledrow[0] <= 1;
-                            bytes_counter <= 0;      
                             expected_bytes <= bytes_in[6]; 
                         end
                         8'h02: begin // get configuration descriptor
@@ -290,7 +298,7 @@ always @(posedge clk48mhz ) begin
                             expected_bytes <= bytes_in[6];
                         end
                         8'h03: begin
-                            case (bytes_in[2])
+                            case (bytes_in[2]) //wValue [0] 
                                 8'h00: begin //string configuration 
                                     config_offset <= 43;
                                     expected_bytes <= 4; 
@@ -339,7 +347,7 @@ always @(posedge clk48mhz ) begin
                     if ( bytes_counter == 0 || (data_strobe && !data_strobe_loc)) begin
                         data_in_valid <= 1'b1;
                         data_in <= configuration[config_offset + bytes_counter[6:0]];
-                        bytes_counter <= bytes_counter + 1;
+                        bytes_counter <= bytes_counter + 1'b1;
                     end
                 end else begin
                     data_in_valid <= 1'b0; 

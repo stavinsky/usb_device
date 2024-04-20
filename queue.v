@@ -29,20 +29,20 @@ always @(posedge clk ) begin
     end
     if (dir && read_success && !dir_latch && !rs_latch)begin
         mem[write_address] <= data_in;
-        write_address <= write_address + 1;
+        write_address <= write_address + 1'b1;
         r_data_out <= mem[read_address];
-        read_address <= read_address + 1;
+        read_address <= read_address + 1'b1;
     end 
     else if (dir && !dir_latch) begin
-        if (cnt < 1240) cnt <= cnt + 1;
+        if (cnt < 1240) cnt <= cnt + 1'b1;
         mem[write_address] <= data_in;
-        write_address <= write_address + 1;
+        write_address <= write_address + 1'b1;
     end
     else if (read_success && !rs_latch) begin
-        if (cnt > 0) cnt <= cnt - 1;
+        if (cnt > 0) cnt <= cnt - 1'b1;
         r_data_out <= mem[read_address];
         // r_data_out <= write_address;
-        read_address <= read_address + 1;
+        read_address <= read_address + 1'b1;
     end 
     else if (empty) begin
         read_address <= 0;
