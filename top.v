@@ -41,8 +41,8 @@ module top(
               .data_out(q_data_out),
               .r_clk(q_r_clk),
               .w_clk(q_data_in_ready),
-              .full(q_full) 
-            //   .rst(rst)
+              .full(q_full),
+              .rst(rst)
 
           );
 
@@ -318,7 +318,7 @@ module top(
                     if (success) begin
                         status <= st_idle;
                     end
-                    if (bytes_counter < expected_bytes) begin
+                    if (bytes_counter < expected_bytes & (~q_empty | q_r_clk| data_in_valid)) begin
                         q_r_clk <= 1'b0;
                         data_in <= q_data_out;
                         data_in_valid <= 1'b1; 
