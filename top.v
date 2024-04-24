@@ -12,10 +12,23 @@ module top(
         output [2:0]probe_code
     );
 
+    reg started =0;
+    initial started =0;
+    reg [$clog2(1000)-1:0] start_counter = 0;
+    always @(posedge clk48mhz) begin
+        if (start_counter < 1000) begin
+            start_counter <= start_counter + 1'b1;
+        end
+        else begin
+            started <= 1;
+        end
+    end
+
+
     wire clk48mhz;
     wire clk_locked;
-
-    assign usb_dp_pull = rst;
+    
+    assign usb_dp_pull = rst & started;
     wire q_empty;
     reg [7:0] q_data_in = 8'h0;
     wire [7:0] q_data_out;
@@ -332,7 +345,7 @@ module top(
 
         endcase
 
-        if (!rst || usb_rst) begin
+        if (!rst | usb_rst | ~started) begin
             // // r_ledrow <= 5'b0;
             r_ledrow <= 5'b00000;
             uart_counter <= 0;
