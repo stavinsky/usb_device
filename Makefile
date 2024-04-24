@@ -20,8 +20,8 @@ build/pnr_build.json: build/build.json $(PINS)
       	--vopt family=GW1N-9C \
 		--placer-heap-cell-placement-timeout 8 \
 		--threads `nproc` \
-		--pre-pack prepack.py 
-	    # --randomize-seed
+		--pre-pack prepack.py \
+	    --randomize-seed
 # build/pnr_build.json: build/build.json $(PINS)
 # 	nextpnr-gowin  \
 # 	    --json build/build.json \

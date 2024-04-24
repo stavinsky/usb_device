@@ -19,18 +19,17 @@ module top(
     wire q_empty;
     reg [7:0] q_data_in = 8'h0;
     wire [7:0] q_data_out;
-    reg q_read_success;
+    reg q_r_clk = 0;
     reg q_data_in_ready = 0;
     wire q_full;
     queue queue1(
               .empty(q_empty),
               .data_in(q_data_in),
               .data_out(q_data_out),
-              .read_success(q_read_success),
-              .dir(q_data_in_ready),
-              .clk(clk48mhz),
-              .rst(rst),
-              .full(q_full)
+              .r_clk(q_r_clk),
+              .w_clk(q_data_in_ready),
+              .full(q_full) 
+            //   .rst(rst)
 
           );
 
@@ -41,6 +40,7 @@ module top(
             );
 
     reg [7:0]config_offset = 0;
+    //  (* ram_style = "block" *)
     reg [7:0] configuration [0:200];
     initial begin
         $readmemh("constants.txt", configuration );
@@ -158,7 +158,6 @@ module top(
         r_ledrow[4] <= q_full;
         data_strobe_loc <= data_strobe;
         transaction_loc <= transaction_active;
-        if (q_read_success) q_read_success <= 0;
 
 
         r_probe_code <= setup_stage;
@@ -186,10 +185,12 @@ module top(
                             if (setup_in && direction_in) begin
                                 if (expected_bytes > 0) begin
                                     if (from_descriptor) begin
+                                        data_in <= configuration[config_offset];
                                         status <= send_static_data;
                                     end
                                     else begin
                                         status <= st_send_data;
+                                        if (~q_empty )q_r_clk <= 1'b1;
                                     end
                                     bytes_counter <= 0;
                                     setup_toggle <= ~setup_toggle;
@@ -232,14 +233,11 @@ module top(
             end
             st_get_data: begin
                 data_toggle <= setup_toggle;
-                if (q_data_in_ready ) q_data_in_ready <= 1'b0;
+                q_data_in <= data_out;
                 if (success) begin
                     status <= st_idle;
                 end 
-                else if (data_strobe && !data_strobe_loc) begin
-                    q_data_in <= data_out;
-                    q_data_in_ready <= 1'b1;
-                end
+                q_data_in_ready = data_strobe;
             end
             st_prepare_response: begin
                 status <= st_idle;
@@ -281,43 +279,50 @@ module top(
             send_static_data: begin
                 data_toggle <= setup_toggle;
                 data_in <= configuration[config_offset + bytes_counter[6:0]];
-                if (transaction_active) begin
-                    if (success) begin
-                        status <= st_idle;
-                    end
-                    if (bytes_counter < expected_bytes) begin
-                        
-                        data_in_valid <= 1'b1;
-                        if (data_strobe && !data_strobe_loc) begin
-                            bytes_counter <= bytes_counter + 1'b1;
-                        end
-                    end
-                    else begin
-                        data_in_valid <= 1'b0;
+                if (success) begin
+                    status <= st_idle;
+                end 
+                else if (bytes_counter < expected_bytes) begin
+                    
+                    data_in_valid <= 1'b1;
+                    
+                    if (data_strobe) begin
+                        bytes_counter <= bytes_counter + 1'b1;
                     end
                 end
                 else begin
+                    data_in_valid <= 1'b0;
+                    data_in <= 0;
+                end
+                if (~transaction_active) begin
                     status <= st_idle;
                 end
             end
             st_send_data: begin
                 data_toggle <= setup_toggle;
-                data_in <= q_data_out;
+                
                 if (transaction_active) begin
                     if (success) begin
                         status <= st_idle;
                     end
-                    if (bytes_counter < expected_bytes ) begin
+                    if (bytes_counter < expected_bytes) begin
+                        q_r_clk <= 1'b0;
+                        data_in <= q_data_out;
+                        data_in_valid <= 1'b1; 
                         
-                        data_in_valid <= 1'b1;
-                        if ( (data_strobe && !data_strobe_loc)) begin
-                            
-                            if (bytes_counter < expected_bytes) q_read_success <= 1'b1;
-                            bytes_counter <= bytes_counter + 1'b1;
+                        
+                        
+                        if (data_strobe) begin
+                            q_r_clk <= 1'b1;
+                            if (q_empty) bytes_counter <= expected_bytes;
+                            else bytes_counter <= bytes_counter + 1'b1;
                         end
+                            
                     end
                     else begin
                         data_in_valid <= 1'b0;
+                        data_in <= 0;
+                        q_r_clk <= 0;
                     end
                 end
                 else begin
@@ -329,7 +334,7 @@ module top(
 
         if (!rst || usb_rst) begin
             // // r_ledrow <= 5'b0;
-            // r_ledrow <= 5'b00000;
+            r_ledrow <= 5'b00000;
             uart_counter <= 0;
             bytes_out_counter <= 0;
             status <= st_idle;
@@ -344,6 +349,9 @@ module top(
             setup_stage <= setup_stage_idle;
             setup_in <= 0;
             setup_toggle <= 0;
+            q_r_clk <= 0;
+            q_data_in_ready <= 0;
+
 
 
         end

@@ -1,55 +1,39 @@
-module queue(
-    input clk,
-    input [7:0]data_in,
-    output [7:0]data_out,
-    input dir,
-    input read_success,
-    output empty,
-    input rst 
+module queue #(parameter size = 256) (r_clk, data_out, w_clk, data_in, empty, full, rst);
+    input r_clk;
+    output [7:0]data_out;
+
+    input w_clk;
+    input [7:0]data_in;
+
+    output empty;
+    output full;
+    input rst;
+
+    parameter adr_size = $clog2(size) -1 ;
+    (* ram_style = "block" *)
+    reg [7:0] mem [0:size-1];
+    reg [adr_size:0] r_address = 0;
+    reg [adr_size:0] w_address = 0;
+    reg [7:0]r_data_out = 0;
     
-);
+    assign data_out = r_data_out;
 
-reg [7:0] mem [0:1240];
-reg [10:0]write_address = 0;
-reg [10:0]read_address = 0;
-reg [7:0] r_data_out;
-assign data_out = r_data_out;
-reg [10:0] cnt = 0;
-assign empty = cnt == 0;
-reg dir_latch;
-reg rs_latch;
-always @(posedge clk ) begin
-    dir_latch <= dir;
-    rs_latch <= read_success;
-    if (!rst) begin
-        cnt <= 0;
-        write_address <=0;
-        read_address <=0;
-        r_data_out <= 0;
-    end
-    if (dir && read_success && !dir_latch && !rs_latch)begin
-        mem[write_address] <= data_in;
-        write_address <= write_address + 1'b1;
-        r_data_out <= mem[read_address];
-        read_address <= read_address + 1'b1;
-    end 
-    else if (dir && !dir_latch) begin
-        if (cnt < 1240) cnt <= cnt + 1'b1;
-        mem[write_address] <= data_in;
-        write_address <= write_address + 1'b1;
-    end
-    else if (read_success && !rs_latch) begin
-        if (cnt > 0) cnt <= cnt - 1'b1;
-        r_data_out <= mem[read_address];
-        // r_data_out <= write_address;
-        read_address <= read_address + 1'b1;
-    end 
-    else if (empty) begin
-        read_address <= 0;
-        write_address <= 0;
+    always @(posedge r_clk) begin
+        // if (~rst) r_address <= '0;
+        if (~empty) begin
+            r_data_out <= mem[r_address];
+            r_address <= r_address + 1'b1;
+        end
     end
 
-end
+    always @(posedge w_clk ) begin
+        // if (~rst) w_address <= '0;
+        if (~full) begin
+            mem[w_address] <= data_in;
+            w_address <= w_address + 1'b1;
+        end
+    end
 
-
+    assign empty = r_address == w_address;
+    assign full = (w_address + 1'b1) == r_address;
 endmodule

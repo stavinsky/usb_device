@@ -10,7 +10,7 @@ IO_LOC "ledrow[3]" 14;
 IO_PORT "ledrow[3]" IO_TYPE=LVCMOS33;
 IO_LOC "ledrow[4]" 15;
 IO_PORT "ledrow[4]" IO_TYPE=LVCMOS33;
-//IO_LOC "led" 16;
+// IO_LOC "led" 16;dd
 
 IO_LOC "rst" 4;
 IO_PORT "rst" IO_TYPE=LVCMOS33;

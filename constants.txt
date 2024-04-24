@@ -30,7 +30,7 @@ c0 //bmAttributes
 //                                        interface 0 configuration descriptor offset = 18 + 9 = 27
 09 // bLength
 04 // bDescriptorType
-00 // bInterfaceNumber
+01 // bInterfaceNumber
 00 // bAlternateSetting
 01 // bNumEndpoints
 00 // bInterfaceClass
@@ -56,8 +56,8 @@ ad //  iInterface (string index for interface)
 1c 03 41 00 6e 00 74 00 6f 00 6e 00 27 00 73 00 44 00 65 00 76 00 69 00 63 00 65 00
         // interface string offset = 73 + 28 = 101
 24 03 41 00 6e 00 74 00 6f 00 6e 00 27 00 73 00 20 00 69 00 6e 00 74 00 65 00 72 00 66 00 61 00 63 00 65 00
-00
-00
+00 // get status
+00 // get status
 00
 00
 00

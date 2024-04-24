@@ -1,5 +1,5 @@
 
-module pll48MHz_module (
+module usb_pll (
     input clk27mhz,
     output clk48mhz,
     output clk_locked
