@@ -10,6 +10,7 @@ add_file usbcorev/usb_recv.v
 add_file usbcorev/usb_tx.v
 add_file usbcorev/usb_utils.v
 add_file usbcorev/utils.v
+add_file buffered_uart_tx.v
 set_device GW1NR-LV9QN88PC6/I5
 set_option -top_module  top
 run all

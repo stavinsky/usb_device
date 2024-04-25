@@ -30,7 +30,7 @@ c0 //bmAttributes
 //                                        interface 0 configuration descriptor offset = 18 + 9 = 27
 09 // bLength
 04 // bDescriptorType
-01 // bInterfaceNumber
+00 // bInterfaceNumber
 00 // bAlternateSetting
 01 // bNumEndpoints
 00 // bInterfaceClass

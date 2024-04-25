@@ -13,7 +13,7 @@ module top(
     );
 
     reg started =0;
-    initial started =0;
+
     reg [$clog2(1000)-1:0] start_counter = 0;
     always @(posedge clk48mhz) begin
         if (start_counter < 1000) begin
@@ -27,24 +27,25 @@ module top(
 
     wire clk48mhz;
     wire clk_locked;
-    
-    assign usb_dp_pull = rst & started;
-    wire q_empty;
-    reg [7:0] q_data_in = 8'h0;
-    wire [7:0] q_data_out;
-    reg q_r_clk = 0;
-    reg q_data_in_ready = 0;
-    wire q_full;
-    queue queue1(
-              .empty(q_empty),
-              .data_in(q_data_in),
-              .data_out(q_data_out),
-              .r_clk(q_r_clk),
-              .w_clk(q_data_in_ready),
-              .full(q_full),
-              .rst(rst)
 
-          );
+    wire data_strobe;
+    wire [7:0] data_out;
+    wire uart1_tx_dv;
+    reg [7:0]uart_tx1_data;
+    always @(direction_in) begin 
+        uart_tx1_data = (direction_in) ? data_in : data_out;
+    end
+    buffered_uart_tx uart_tx1 (
+                        .uart_tx(uart),
+                        .clk(clk48mhz),
+                        .data(uart_tx1_data),
+                        .data_valid(data_strobe), 
+                        .full(),
+                        .rst(rst)
+                     );
+
+    assign usb_dp_pull = rst & started;
+
 
     usb_pll usb_clk(
                 .clk27mhz(clk27mhz),
@@ -53,7 +54,6 @@ module top(
             );
 
     reg [7:0]config_offset = 0;
-    //  (* ram_style = "block" *)
     reg [7:0] configuration [0:200];
     initial begin
         $readmemh("constants.txt", configuration );
@@ -72,9 +72,7 @@ module top(
     reg data_toggle = 0;
     reg [1:0] handshake = 2'b00;
     reg [7:0] data_in = 8'h00;
-    wire [7:0] data_out;
     reg data_in_valid = 0;
-    wire data_strobe;
     wire success; // crc is valid
     reg usb_dp_sync;
     reg usb_dn_sync;
@@ -167,8 +165,7 @@ module top(
     reg from_descriptor = 0;
     // assign r_ledrow[0] = q_empty;
     always @(posedge clk48mhz ) begin
-        r_ledrow[0] <= q_empty;
-        r_ledrow[4] <= q_full;
+
         data_strobe_loc <= data_strobe;
         transaction_loc <= transaction_active;
 
@@ -203,14 +200,14 @@ module top(
                                     end
                                     else begin
                                         status <= st_send_data;
-                                        if (~q_empty )q_r_clk <= 1'b1;
+                                        // if (~q_empty )q_r_clk <= 1'b1;
                                     end
                                     bytes_counter <= 0;
                                     setup_toggle <= ~setup_toggle;
                                 end
                             end
                             else if (!setup_in && !direction_in) begin
-                                setup_toggle <= ~setup_toggle; 
+                                setup_toggle <= ~setup_toggle;
                                 status <= st_get_data;
 
                             end
@@ -246,11 +243,9 @@ module top(
             end
             st_get_data: begin
                 data_toggle <= setup_toggle;
-                q_data_in <= data_out;
                 if (success) begin
                     status <= st_idle;
-                end 
-                q_data_in_ready = data_strobe;
+                end
             end
             st_prepare_response: begin
                 status <= st_idle;
@@ -290,22 +285,22 @@ module top(
             end
 
             send_static_data: begin
-                data_toggle <= setup_toggle;
                 data_in <= configuration[config_offset + bytes_counter[6:0]];
+                data_toggle <= setup_toggle;
                 if (success) begin
                     status <= st_idle;
-                end 
+                end
                 else if (bytes_counter < expected_bytes) begin
-                    
+
                     data_in_valid <= 1'b1;
-                    
+
                     if (data_strobe) begin
                         bytes_counter <= bytes_counter + 1'b1;
                     end
                 end
                 else begin
                     data_in_valid <= 1'b0;
-                    data_in <= 0;
+                    // data_in <= 0;
                 end
                 if (~transaction_active) begin
                     status <= st_idle;
@@ -313,30 +308,30 @@ module top(
             end
             st_send_data: begin
                 data_toggle <= setup_toggle;
-                
+
                 if (transaction_active) begin
-                    if (success) begin
-                        status <= st_idle;
-                    end
-                    if (bytes_counter < expected_bytes & (~q_empty | q_r_clk| data_in_valid)) begin
-                        q_r_clk <= 1'b0;
-                        data_in <= q_data_out;
-                        data_in_valid <= 1'b1; 
-                        
-                        
-                        
-                        if (data_strobe) begin
-                            q_r_clk <= 1'b1;
-                            if (q_empty) bytes_counter <= expected_bytes;
-                            else bytes_counter <= bytes_counter + 1'b1;
-                        end
-                            
-                    end
-                    else begin
-                        data_in_valid <= 1'b0;
-                        data_in <= 0;
-                        q_r_clk <= 0;
-                    end
+                    // if (success) begin
+                    //     status <= st_idle;
+                    // end
+                    // if (bytes_counter < expected_bytes & (~q_empty | q_r_clk| data_in_valid)) begin
+                    //     q_r_clk <= 1'b0;
+                    //     data_in <= q_data_out;
+                    //     data_in_valid <= 1'b1;
+
+
+
+                    //     if (data_strobe) begin
+                    //         q_r_clk <= 1'b1;
+                    //         if (q_empty) bytes_counter <= expected_bytes;
+                    //         else bytes_counter <= bytes_counter + 1'b1;
+                    //     end
+
+                    // end
+                    // else begin
+                    //     data_in_valid <= 1'b0;
+                    //     data_in <= 0;
+                    //     q_r_clk <= 0;
+                    // end
                 end
                 else begin
                     status <= st_idle;
@@ -362,8 +357,6 @@ module top(
             setup_stage <= setup_stage_idle;
             setup_in <= 0;
             setup_toggle <= 0;
-            q_r_clk <= 0;
-            q_data_in_ready <= 0;
 
 
 
