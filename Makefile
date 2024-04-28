@@ -1,4 +1,4 @@
-SYNTH_SRCS=top.v  buffered_uart_tx.v uart_tx.v  queue.v usb_pll.v rpll.v usbcorev/usb.v usbcorev/usb_tx.v usbcorev/usb_recv.v usbcorev/usb_utils.v usbcorev/utils.v
+SYNTH_SRCS=top.v $(wildcard modules/*.v) buffered_uart_tx.v uart_tx.v  queue.v usb_pll.v rpll.v usbcorev/usb.v usbcorev/usb_tx.v usbcorev/usb_recv.v usbcorev/usb_utils.v usbcorev/utils.v
 PINS=pins.cst
 DEVICE=GW1NR-LV9QN88PC6/I5
 BOARD='tangnano9k'
@@ -9,7 +9,7 @@ PNR=/Users/stavinsky/build/nextpnr/build/nextpnr-himbaechel
 .DEFAULT_GOAL := build/pack.fs
 
 build/build.json: $(SYNTH_SRCS)
-	yosys   -p  'read_verilog  $(SYNTH_SRCS) ; synth_gowin -json $@'
+	yosys   -p  'read_verilog  $(SYNTH_SRCS) ; synth_gowin -json $@' > build/yosys.log
 
 build/pnr_build.json: build/build.json $(PINS)
 	$(PNR)  \
@@ -20,7 +20,7 @@ build/pnr_build.json: build/build.json $(PINS)
       	--vopt family=GW1N-9C \
 		--placer-heap-cell-placement-timeout 8 \
 		--threads `nproc` \
-		--pre-pack prepack.py \
+		--pre-pack scripts/prepack.py \
 	    --randomize-seed
 # build/pnr_build.json: build/build.json $(PINS)
 # 	nextpnr-gowin  \
