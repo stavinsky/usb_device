@@ -6,7 +6,7 @@ module multisample3(
 
 reg[2:0] r;
 
-always @(r) begin
+always @* begin
     case (r)
         3'b000: out = 1'b0;
         3'b001: out = 1'b0;
@@ -34,7 +34,7 @@ module multisample5(
 
 reg[4:0] r;
 
-always @(r) begin
+always @* begin
     case (r)
         5'b00000: out = 1'b0;
         5'b00001: out = 1'b0;

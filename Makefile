@@ -1,4 +1,4 @@
-SYNTH_SRCS=top.v $(wildcard modules/*.v) buffered_uart_tx.v uart_tx.v  queue.v usb_pll.v rpll.v usbcorev/usb.v usbcorev/usb_tx.v usbcorev/usb_recv.v usbcorev/usb_utils.v usbcorev/utils.v
+SYNTH_SRCS=$(wildcard modules/*.v) usbcorev/usb.v usbcorev/usb_tx.v usbcorev/usb_recv.v usbcorev/usb_utils.v usbcorev/utils.v
 PINS=pins.cst
 DEVICE=GW1NR-LV9QN88PC6/I5
 BOARD='tangnano9k'
