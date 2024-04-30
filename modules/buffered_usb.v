@@ -64,7 +64,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     reg [7:0]config_offset = 0;
     reg [7:0] configuration [0:200];
     initial begin
-        $readmemh("constants.txt", configuration );
+        $readmemh("/home/dev/dev/fpga/usb_device/constants.txt", configuration );
     end
 
     wire usb_recv_queue_w_clk;
@@ -132,31 +132,39 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
 ///// setup recv 
     reg [6:0] usb_addr_temp = 0;
     reg setup_in = 0;
+    reg [1:0]setup_handshake = hs_ack;
+    reg  setup_data_ready = 0;
     always @(posedge clk) begin
         if (!rst | usb_rst ) begin
-            usb_recv_queue_r_en = 1'b0;
+            usb_recv_queue_r_en <= 1'b0;
             setup_in <= 0;
             usb_addr_temp <= 0;
             handshake <= hs_ack;
         end
+        if (~setup_data_ready & !usb_recv_queue_empty) begin
+            if (!usb_recv_queue_r_en) begin 
+                usb_recv_queue_r_en <= 1'b1 ;
+            end
+            else begin
+                bytes_in[got_bytes] <= usb_recv_queue_data_out;
+                got_bytes <= got_bytes + 1'b1;
+ 
+            end
+        end 
         case (status) 
             get_setup_data: begin
                 if (success) begin
-                   usb_recv_queue_r_en = 1'b1 ;
                 end
             end
             st_prepare_response: begin
-                if (~usb_recv_queue_empty) begin
-                    
-                    bytes_in[got_bytes] <= usb_recv_queue_data_out;
-                    got_bytes <= got_bytes + 1'b1;
-                end
                 setup_in <= bytes_in[0][7];
                 setup_response();
+                handshake <= setup_handshake;
             end
             st_idle: begin
-                usb_recv_queue_r_en = 1'b0;
+                usb_recv_queue_r_en <= 1'b0;
                 got_bytes <= 0;
+                
                 if (handshake != hs_ack)
                         handshake <= hs_ack;
             end
@@ -336,6 +344,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         input [7:0] requested_size;
 
         begin
+            setup_handshake = hs_ack;
             case (descriptor_type) //wValue [1]
                 8'h01: begin //get device descriptor
                     get_descriptor_offset = {configuration[0], 8'h00};
@@ -349,7 +358,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 end
                 default: begin
                     get_descriptor_offset = {8'h00, 8'h00};
-                    handshake = hs_stall;
+                    setup_handshake = hs_stall;
                 end
             endcase
         end
