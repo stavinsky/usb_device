@@ -26,7 +26,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     reg data_strobe_loc = 0;
     reg transaction_loc = 0;
     reg setup_toggle = 0;
-    reg setup_in = 0;
+   
     reg from_descriptor = 0;
     wire [3:0] endpoint ;
     wire direction_in;
@@ -129,12 +129,15 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             .tx_j(usb_tx_j),
             .tx_en(usb_tx_en)
         );
-
+///// setup recv 
     reg [6:0] usb_addr_temp = 0;
-
+    reg setup_in = 0;
     always @(posedge clk) begin
         if (!rst | usb_rst ) begin
             usb_recv_queue_r_en = 1'b0;
+            setup_in <= 0;
+            usb_addr_temp <= 0;
+            handshake <= hs_ack;
         end
         case (status) 
             get_setup_data: begin
@@ -148,14 +151,18 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                     bytes_in[got_bytes] <= usb_recv_queue_data_out;
                     got_bytes <= got_bytes + 1'b1;
                 end
+                setup_in <= bytes_in[0][7];
+                setup_response();
             end
             st_idle: begin
                 usb_recv_queue_r_en = 1'b0;
                 got_bytes <= 0;
+                if (handshake != hs_ack)
+                        handshake <= hs_ack;
             end
         endcase
     end
-
+////// /setup recv
     always @(posedge clk) begin
 
         data_strobe_loc <= data_strobe;
@@ -217,8 +224,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
 
                 end
                 else begin
-                    if (handshake != hs_ack)
-                        handshake <= hs_ack;
+
                     status <= st_idle;
                     setup_stage <= setup_stage_idle;
                 end
@@ -241,8 +247,8 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 if (usb_recv_queue_empty) begin
                     status <= st_idle;
                     setup_stage <= setup_stage_data;
-                    setup_in <= bytes_in[0][7];
-                    setup_response();
+                    
+                    
                 end
             end
 
@@ -308,11 +314,11 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             bytes_out_counter <= 0;
             status <= st_idle;
             usb_address <= 0;
-            usb_addr_temp <= 0;
-            handshake <= hs_ack;
+            
+            
             data_toggle <= 0;
             setup_stage <= setup_stage_idle;
-            setup_in <= 0;
+            
             setup_toggle <= 0;
 
 
