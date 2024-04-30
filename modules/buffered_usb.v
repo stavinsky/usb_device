@@ -26,7 +26,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     reg data_strobe_loc = 0;
     reg transaction_loc = 0;
     reg setup_toggle = 0;
-   
+
     reg from_descriptor = 0;
     wire [3:0] endpoint ;
     wire direction_in;
@@ -72,7 +72,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     wire [7:0]usb_recv_queue_data_out;
     reg  usb_recv_queue_r_clk ;
     reg usb_recv_queue_r_en = 1'b0;
-    always @* begin 
+    always @* begin
         usb_recv_queue_r_clk = (usb_recv_queue_r_en)? clk : 1'b0;
     end
     assign usb_recv_queue_w_clk = (direction_in) ?  1'b0 : data_strobe_loc;
@@ -129,7 +129,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             .tx_j(usb_tx_j),
             .tx_en(usb_tx_en)
         );
-///// setup recv 
+    ///// setup recv
     reg [6:0] usb_addr_temp = 0;
     reg setup_in = 0;
     reg [1:0]setup_handshake = hs_ack;
@@ -141,36 +141,35 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             usb_addr_temp <= 0;
             handshake <= hs_ack;
         end
+
         if (~setup_data_ready & !usb_recv_queue_empty) begin
-            if (!usb_recv_queue_r_en) begin 
+            if (!usb_recv_queue_r_en) begin
                 usb_recv_queue_r_en <= 1'b1 ;
             end
             else begin
                 bytes_in[got_bytes] <= usb_recv_queue_data_out;
                 got_bytes <= got_bytes + 1'b1;
- 
+                usb_recv_queue_r_en <= 1'b0 ;
             end
-        end 
-        case (status) 
-            get_setup_data: begin
-                if (success) begin
-                end
-            end
-            st_prepare_response: begin
-                setup_in <= bytes_in[0][7];
-                setup_response();
-                handshake <= setup_handshake;
-            end
-            st_idle: begin
-                usb_recv_queue_r_en <= 1'b0;
-                got_bytes <= 0;
-                
-                if (handshake != hs_ack)
-                        handshake <= hs_ack;
-            end
-        endcase
+        end
+        else if (got_bytes == 7 ) begin
+            setup_in <= bytes_in[0][7];
+            setup_response();
+            handshake <= setup_handshake;
+            setup_data_ready <= 1;
+        end
+        if (status == st_idle) begin
+
+            setup_data_ready <= 0; // TODO figure out when to set it to zero
+            usb_recv_queue_r_en <= 1'b0;
+            got_bytes <= 0;
+
+            if (handshake != hs_ack)
+                handshake <= hs_ack;
+        end
     end
-////// /setup recv
+
+    ////// /setup recv
     always @(posedge clk) begin
 
         data_strobe_loc <= data_strobe;
@@ -239,8 +238,10 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
 
             end
             get_setup_data: begin
-                if (success) begin
-                    status <= st_prepare_response;
+                if (setup_data_ready) begin
+                    status <= st_idle;
+                    setup_stage <= setup_stage_data;
+
                 end
 
             end
@@ -253,10 +254,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             st_prepare_response: begin
 
                 if (usb_recv_queue_empty) begin
-                    status <= st_idle;
-                    setup_stage <= setup_stage_data;
-                    
-                    
+
                 end
             end
 
@@ -322,11 +320,11 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             bytes_out_counter <= 0;
             status <= st_idle;
             usb_address <= 0;
-            
-            
+
+
             data_toggle <= 0;
             setup_stage <= setup_stage_idle;
-            
+
             setup_toggle <= 0;
 
 
