@@ -85,7 +85,8 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     reg usb_send_queue_w_en=0;
     wire usb_send_queue_empty;
     reg [7:0]usb_send_queue_data_in;
-    assign usb_send_queue_r_clk = (direction_in) ? data_strobe_loc : 1'b0;
+    reg write_first_byte = 0;
+    assign usb_send_queue_r_clk = (direction_in) ? (data_strobe_loc  | write_first_byte): 1'b0;
     always @* begin
         usb_send_queue_w_clk = (usb_send_queue_w_en)? clk : 1'b0;
     end
@@ -184,6 +185,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     end
 
     always @(posedge clk) begin
+        write_first_byte <= 1'b0;
 
         case (status)
 
@@ -209,6 +211,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                                 if (expected_bytes > 0) begin
                                     if (from_descriptor) begin
                                         status <= send_static_data;
+                                        write_first_byte <= 1'b1;
                                     end
                                     else begin
                                         status <= st_send_data;
@@ -266,11 +269,12 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 else if (~usb_send_queue_empty) begin
                     data_in_valid <= 1'b1;
                 end
-                else begin
+                else if (data_strobe_loc)begin
                     data_in_valid <= 1'b0;
                 end
                 if (~transaction_active) begin
                     status <= st_idle;
+                     data_in_valid <= 1'b0; 
                 end
             end
             st_send_data: begin
