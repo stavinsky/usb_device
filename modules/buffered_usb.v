@@ -16,7 +16,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     wire usb_rst; // set to 1 if usb device got reset from the host
     reg [6:0] usb_address;
     reg [1:0] handshake = 2'b00;
-    reg [7:0] data_in = 8'h00;
+    wire [7:0] data_in;
     reg data_in_valid = 0;
     reg [7:0] bytes_counter = 0;
     reg [7:0] uart_counter = 0;
@@ -77,25 +77,21 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     end
     assign usb_recv_queue_w_clk = (direction_in) ?  1'b0 : data_strobe_loc;
 
-    queue usb_recv_queue (
-              .r_clk(usb_recv_queue_r_clk),
-              .data_out(usb_recv_queue_data_out),
-              .w_clk(usb_recv_queue_w_clk),
-              .data_in(data_out),
-              .empty(usb_recv_queue_empty),
-              .full(),
-              .rst(rst)
-          );
+    queue usb_recv_queue ( .r_clk(usb_recv_queue_r_clk), .data_out(usb_recv_queue_data_out), .w_clk(usb_recv_queue_w_clk), .data_in(data_out), .empty(usb_recv_queue_empty), .full(), .rst(rst));
+    buffered_uart_tx uart_tx1 ( .uart_tx(uart_tx), .clk(clk), .data(uart_tx1_data), .data_valid(data_strobe), .full(), .rst(rst));
 
+    wire usb_send_queue_r_clk;
+    reg usb_send_queue_w_clk;
+    reg usb_send_queue_w_en=0;
+    wire usb_send_queue_empty;
+    reg [7:0]usb_send_queue_data_in;
+    assign usb_send_queue_r_clk = (direction_in) ? data_strobe_loc : 1'b0;
+    always @* begin
+        usb_send_queue_w_clk = (usb_send_queue_w_en)? clk : 1'b0;
+    end
+ 
+    queue usb_send_queue (.r_clk(usb_send_queue_r_clk), .data_out(data_in), .w_clk(usb_send_queue_w_clk), .data_in(usb_send_queue_data_in), .empty(usb_send_queue_empty), .full(), .rst(rst));
 
-    buffered_uart_tx uart_tx1 (
-                         .uart_tx(uart_tx),
-                         .clk(clk),
-                         .data(uart_tx1_data),
-                         .data_valid(data_strobe),
-                         .full(),
-                         .rst(rst)
-                     );
 
 
     always @(posedge clk) begin
@@ -142,14 +138,13 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             handshake <= hs_ack;
         end
 
-        if (~setup_data_ready & !usb_recv_queue_empty) begin
+        if (~setup_data_ready & !usb_recv_queue_empty) begin // collect setup data 
             if (!usb_recv_queue_r_en) begin
                 usb_recv_queue_r_en <= 1'b1 ;
             end
             else begin
                 bytes_in[got_bytes] <= usb_recv_queue_data_out;
                 got_bytes <= got_bytes + 1'b1;
-                usb_recv_queue_r_en <= 1'b0 ;
             end
         end
         else if (got_bytes == 7 ) begin
@@ -157,6 +152,18 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             setup_response();
             handshake <= setup_handshake;
             setup_data_ready <= 1;
+            bytes_counter <= 0;
+        end
+        else if (bytes_counter < expected_bytes) begin
+            if (~usb_send_queue_w_en) begin
+                usb_send_queue_w_en <= 1;
+            end
+            usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
+            bytes_counter <= bytes_counter + 1'b1;
+             
+        end
+        else begin 
+            usb_send_queue_w_en <= 1'b0;
         end
         if (status == st_idle) begin
 
@@ -201,14 +208,12 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                             if (setup_in && direction_in) begin
                                 if (expected_bytes > 0) begin
                                     if (from_descriptor) begin
-                                        data_in <= configuration[config_offset];
                                         status <= send_static_data;
                                     end
                                     else begin
                                         status <= st_send_data;
                                         // if (~q_empty )q_r_clk <= 1'b1;
                                     end
-                                    bytes_counter <= 0;
                                     setup_toggle <= ~setup_toggle;
                                 end
                             end
@@ -251,30 +256,18 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                     status <= st_idle;
                 end
             end
-            st_prepare_response: begin
 
-                if (usb_recv_queue_empty) begin
-
-                end
-            end
 
             send_static_data: begin
-                data_in <= configuration[config_offset + bytes_counter[6:0]];
                 data_toggle <= setup_toggle;
                 if (success) begin
                     status <= st_idle;
                 end
-                else if (bytes_counter < expected_bytes) begin
-
+                else if (~usb_send_queue_empty) begin
                     data_in_valid <= 1'b1;
-
-                    if (data_strobe) begin
-                        bytes_counter <= bytes_counter + 1'b1;
-                    end
                 end
                 else begin
                     data_in_valid <= 1'b0;
-                    // data_in <= 0;
                 end
                 if (~transaction_active) begin
                     status <= st_idle;
@@ -356,7 +349,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 end
                 default: begin
                     get_descriptor_offset = {8'h00, 8'h00};
-                    setup_handshake = hs_stall;
+                    // setup_handshake = hs_stall;
                 end
             endcase
         end
