@@ -200,6 +200,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     end
     reg control_transaction_finished = 1'b1;
     reg [7:0]counter = 0;
+    reg write_last_byte = 0;
     always @(posedge clk) begin
         data_toggle <= setup_data_toggle;
         case (status)
@@ -225,14 +226,19 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 end
             end
             st_send_data: begin
+                write_first_byte <= 1'b0; // TODO fix me
                 if (!usb_send_queue_empty)begin
                     if (!write_first_byte && !data_in_valid ) begin
                         write_first_byte <= 1'b1;
                         data_in_valid <= 1'b1;
                     end
                 end
+                else if (!write_last_byte && data_strobe_loc) begin  // TODO: Fix ME
+                    write_last_byte <= 1'b1;
+                end
                 else if (data_in_valid && usb_send_queue_empty && data_strobe_loc) begin
                     data_in_valid <= 1'b0;
+                    write_last_byte <= 1'b0;
                 end
                 if (data_strobe_loc) begin
                     counter <= counter + 1'b1;
