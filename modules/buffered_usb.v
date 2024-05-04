@@ -40,19 +40,12 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         hs_stall = 2'b11;
     localparam
         st_idle = 0,
-        get_setup_data = 1,
-        st_prepare_response = 2,
-        send_static_data = 3,
-        st_setup = 5,
-        st_get_data = 6,
-        st_send_data = 7;
-    localparam
-        setup_stage_idle=0,
-        setup_stage_data=1,
-        setup_stage_status=2;
+        st_get_setup_data = 1,
+        st_get_data = 2,
+        st_send_data = 3;
 
-    reg [7:0] status = st_idle;
-    reg [2:0] setup_stage = setup_stage_idle;
+
+    reg [1:0] status = st_idle;
     reg [7:0] expected_bytes = 0;
     wire [7:0] data_out;
     wire uart1_tx_dv;
@@ -90,7 +83,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     always @* begin
         usb_send_queue_w_clk = (usb_send_queue_w_en)? clk : 1'b0;
     end
- 
+
     queue usb_send_queue (.r_clk(usb_send_queue_r_clk), .data_out(data_in), .w_clk(usb_send_queue_w_clk), .data_in(usb_send_queue_data_in), .empty(usb_send_queue_empty), .full(), .rst(rst));
 
 
@@ -102,78 +95,94 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         end
     end
 
-    usb usb0(
-            .rst_n(rst),
-            .usb_address(usb_address),
-            .usb_rst(usb_rst),
-            .endpoint(endpoint),
-            .transaction_active(transaction_active),
-            .direction_in(direction_in),
-            .setup(setup),
-            .data_toggle(data_toggle),
-            .handshake(handshake),
-            .data_in(data_in),
-            .data_in_valid(data_in_valid),
-            .data_strobe(data_strobe),
-            .success(success),
-            .data_out(data_out),
+    usb usb0( .rst_n(rst),
+              .usb_address(usb_address),
+              .usb_rst(usb_rst),
+              .endpoint(endpoint),
+              .transaction_active(transaction_active),
+              .direction_in(direction_in),
+              .setup(setup),
+              .data_toggle(data_toggle),
+              .handshake(handshake),
+              .data_in(data_in),
+              .data_in_valid(data_in_valid),
+              .data_strobe(data_strobe),
+              .success(success),
+              .data_out(data_out),
 
-            .clk_48(clk),
-            .rx_j(usb_dp_sync),
-            .rx_se0(!usb_dp_sync && !usb_dn_sync),
+              .clk_48(clk),
+              .rx_j(usb_dp_sync),
+              .rx_se0(!usb_dp_sync && !usb_dn_sync),
 
-            .tx_se0(usb_tx_se0),
-            .tx_j(usb_tx_j),
-            .tx_en(usb_tx_en)
-        );
+              .tx_se0(usb_tx_se0),
+              .tx_j(usb_tx_j),
+              .tx_en(usb_tx_en)
+            );
     ///// setup recv
     reg [6:0] usb_addr_temp = 0;
     reg setup_in = 0;
     reg [1:0]setup_handshake = hs_ack;
-    reg  setup_data_ready = 0;
+    reg setup_data_ready = 0;
+    reg setup_data_toggle = 0;
     always @(posedge clk) begin
         if (!rst | usb_rst ) begin
             usb_recv_queue_r_en <= 1'b0;
             setup_in <= 0;
             usb_addr_temp <= 0;
             handshake <= hs_ack;
-        end
-
-        if (~setup_data_ready & !usb_recv_queue_empty) begin // collect setup data 
-            if (!usb_recv_queue_r_en) begin
-                usb_recv_queue_r_en <= 1'b1 ;
-            end
-            else begin
-                bytes_in[got_bytes] <= usb_recv_queue_data_out;
-                got_bytes <= got_bytes + 1'b1;
-            end
-        end
-        else if (got_bytes == 7 ) begin
-            setup_in <= bytes_in[0][7];
-            setup_response();
-            handshake <= setup_handshake;
-            setup_data_ready <= 1;
-            bytes_counter <= 0;
-        end
-        else if (bytes_counter < expected_bytes) begin
-            if (~usb_send_queue_w_en) begin
-                usb_send_queue_w_en <= 1;
-            end
-            usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
-            bytes_counter <= bytes_counter + 1'b1;
-             
-        end
-        else begin 
-            usb_send_queue_w_en <= 1'b0;
-        end
-        if (status == st_idle) begin
-
-            setup_data_ready <= 0; // TODO figure out when to set it to zero
-            usb_recv_queue_r_en <= 1'b0;
+            setup_data_toggle <= 1'b0;
             got_bytes <= 0;
+        end
 
-            if (handshake != hs_ack)
-                handshake <= hs_ack;
+        usb_send_queue_w_en <= 1'b0;
+        case (status)
+            st_idle: begin
+                
+                
+
+                if (handshake != hs_ack)
+                    handshake <= hs_ack;
+                if (!setup_data_ready && !usb_recv_queue_empty) begin // collect setup data
+                    usb_recv_queue_r_en <= 1'b1 ;
+                    bytes_in[got_bytes] <= usb_recv_queue_data_out;
+                    got_bytes <= got_bytes + 1'b1;
+                        
+                end
+                else if (!setup_data_ready && got_bytes == 7 ) begin
+                    setup_in <= bytes_in[0][7];
+                    setup_response();
+                    setup_data_ready <= 1'b1;
+                    bytes_counter <= 8'h00;
+                end
+                if (bytes_counter < expected_bytes) begin
+                    if (~usb_send_queue_w_en) begin
+                        usb_send_queue_w_en <= 1'b1;
+                    end
+                    usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
+                    bytes_counter <= bytes_counter + 1'b1;
+
+                end
+            end
+            st_get_setup_data: begin
+
+            end
+            st_get_data: begin
+                //TODO: ? data toggle
+            end
+            st_send_data: begin
+                if (usb_send_queue_empty) begin
+                    setup_data_toggle <= 1'b1;
+                end
+                if (!transaction_active) begin
+                    setup_data_toggle <= ~setup_data_toggle;
+                end
+
+            end
+        endcase
+        if (control_transaction_finished ) begin
+            setup_data_ready <= 0;
+            setup_data_toggle <= 1'b1;
+            got_bytes <= 0;
         end
     end
 
@@ -183,152 +192,75 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         data_strobe_loc <= data_strobe;
         transaction_loc <= transaction_active;
     end
-
+    reg control_transaction_finished = 1'b1;
+    reg [7:0]counter = 0;
     always @(posedge clk) begin
-        write_first_byte <= 1'b0;
-
+        data_toggle <= setup_data_toggle;
         case (status)
-
             st_idle: begin
-                if (transaction_active && !transaction_loc) begin
-                    if (setup || setup_stage == setup_stage_data) begin
-                        status <= st_setup;
+                data_in_valid <= 0;
+                if (transaction_active) begin
+                    counter <= 0;
+                    if (~setup_data_ready) begin
+                        status <= st_get_setup_data;
+                    end
+                    else if (direction_in) begin
+                        status <= st_send_data;
+                    end
+                    else begin
+                        status <= st_get_data;
                     end
                 end
-
             end
-            st_setup: begin
-                if (transaction_active) begin
-                    case (setup_stage)
-                        setup_stage_idle: begin
-                            status <= get_setup_data;
-                            data_toggle <= 0;
-                            setup_toggle <= 0;
-                        end
-                        setup_stage_data: begin
-
-                            if (setup_in && direction_in) begin
-                                if (expected_bytes > 0) begin
-                                    if (from_descriptor) begin
-                                        status <= send_static_data;
-                                        write_first_byte <= 1'b1;
-                                    end
-                                    else begin
-                                        status <= st_send_data;
-                                        // if (~q_empty )q_r_clk <= 1'b1;
-                                    end
-                                    setup_toggle <= ~setup_toggle;
-                                end
-                            end
-                            else if (!setup_in && !direction_in) begin
-                                setup_toggle <= ~setup_toggle;
-                                status <= st_get_data;
-
-                            end
-                            else if (setup_in ^ direction_in) begin
-                                setup_stage <= setup_stage_status;
-                                data_toggle <= 1;
-                            end
-                        end
-                    endcase
-                end
-                else if (setup_stage == setup_stage_status) begin
-                    setup_stage <= setup_stage_idle;
-                    status <= st_idle;
-                    usb_address <= usb_addr_temp;
-
-                end
-                else begin
-
-                    status <= st_idle;
-                    setup_stage <= setup_stage_idle;
-                end
-
-            end
-            get_setup_data: begin
-                if (setup_data_ready) begin
-                    status <= st_idle;
-                    setup_stage <= setup_stage_data;
-
-                end
-
-            end
-            st_get_data: begin
-                data_toggle <= setup_toggle;
-                if (success) begin
-                    status <= st_idle;
-                end
-            end
-
-
-            send_static_data: begin
-                data_toggle <= setup_toggle;
-                if (success) begin
-                    status <= st_idle;
-                end
-                else if (~usb_send_queue_empty) begin
-                    data_in_valid <= 1'b1;
-                end
-                else if (data_strobe_loc)begin
-                    data_in_valid <= 1'b0;
-                end
+            st_get_setup_data: begin
                 if (~transaction_active) begin
                     status <= st_idle;
-                     data_in_valid <= 1'b0; 
+                    control_transaction_finished <= 0;
                 end
             end
             st_send_data: begin
-                data_toggle <= setup_toggle;
-
-                if (transaction_active) begin
-                    // if (success) begin
-                    //     status <= st_idle;
-                    // end
-                    // if (bytes_counter < expected_bytes & (~q_empty | q_r_clk| data_in_valid)) begin
-                    //     q_r_clk <= 1'b0;
-                    //     data_in <= q_data_out;
-                    //     data_in_valid <= 1'b1;
-
-
-
-                    //     if (data_strobe) begin
-                    //         q_r_clk <= 1'b1;
-                    //         if (q_empty) bytes_counter <= expected_bytes;
-                    //         else bytes_counter <= bytes_counter + 1'b1;
-                    //     end
-
-                    // end
-                    // else begin
-                    //     data_in_valid <= 1'b0;
-                    //     data_in <= 0;
-                    //     q_r_clk <= 0;
-                    // end
+                if (!usb_send_queue_empty)begin
+                    if (!write_first_byte && !data_in_valid ) begin
+                        write_first_byte <= 1'b1;
+                        data_in_valid <= 1'b1;
+                    end
                 end
-                else begin
+                else if (data_in_valid && usb_send_queue_empty && data_strobe_loc) begin
+                    data_in_valid <= 1'b0;
+                end
+                if (data_strobe_loc) begin
+                    counter <= counter + 1'b1;
+                end
+                if (~transaction_active) begin
                     status <= st_idle;
+                    if (counter == 0) begin
+                        control_transaction_finished <= 1'b1;
+                        usb_address <= usb_addr_temp;
+                    end
+                end
+            end
+            st_get_data: begin
+                if (data_strobe_loc) begin
+                    counter <= counter + 1'b1;
+                end
+                if (~transaction_active) begin
+                    status <= st_idle;
+                    if (counter == 0) begin
+                        control_transaction_finished <= 1;
+                        usb_address <= usb_addr_temp;
+                    end
                 end
             end
 
         endcase
-
         if (!rst | usb_rst ) begin
-            // // r_ledrow <= 5'b0;
-            uart_counter <= 0;
-            bytes_out_counter <= 0;
             status <= st_idle;
             usb_address <= 0;
-
-
             data_toggle <= 0;
-            setup_stage <= setup_stage_idle;
-
             setup_toggle <= 0;
-
-
-
+            write_first_byte <= 0;
+            counter <= 0;
         end
-
-
     end
 
 
