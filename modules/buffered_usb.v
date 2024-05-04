@@ -164,11 +164,12 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                     if (~usb_send_queue_w_en) begin
                         usb_send_queue_w_en <= 1'b1;
                     end
-                    usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
+                    
                     bytes_counter <= bytes_counter + 1'b1;
                     if (bytes_counter + 1'b1 == expected_bytes) usb_send_queue_w_en <= 1'b0;
 
                 end
+                usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
             end
             st_get_setup_data: begin
 
@@ -234,7 +235,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 else if (!write_last_byte && data_strobe_loc) begin  // TODO: Fix ME
                     write_last_byte <= 1'b1;
                 end
-                else if (data_in_valid && usb_send_queue_empty && data_strobe_loc) begin
+                else if (data_in_valid &&  data_strobe_loc) begin
                     data_in_valid <= 1'b0;
                     write_last_byte <= 1'b0;
                 end
