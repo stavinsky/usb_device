@@ -144,12 +144,16 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 if (handshake != hs_ack)
                     handshake <= hs_ack;
                 if (!setup_data_ready && !usb_recv_queue_empty) begin // collect setup data
-                    usb_recv_queue_r_en <= 1'b1 ;
-                    bytes_in[got_bytes] <= usb_recv_queue_data_out;
-                    got_bytes <= got_bytes + 1'b1;
+                    if (!usb_recv_queue_r_en) begin 
+                        usb_recv_queue_r_en <= 1'b1 ;
+                    end
+                    else begin
+                        bytes_in[got_bytes] <= usb_recv_queue_data_out;
+                        got_bytes <= got_bytes + 1'b1;
+                    end
                         
                 end
-                else if (!setup_data_ready && got_bytes == 8 ) begin
+                else if (!setup_data_ready && got_bytes == 7 ) begin
                     setup_in <= bytes_in[0][7];
                     setup_response();
                     setup_data_ready <= 1'b1;
