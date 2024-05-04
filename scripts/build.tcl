@@ -4,6 +4,7 @@ add_file modules/top.v
 add_file modules/constants.txt
 
 add_file modules/queue.v
+add_file modules/usb_setup.v
 add_file modules/rpll.v
 add_file modules/uart_tx.v
 add_file modules/usb_pll.v
