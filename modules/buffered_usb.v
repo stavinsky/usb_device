@@ -135,30 +135,30 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             setup_data_ready <= 1'b0;
         end
 
-        usb_send_queue_w_en <= 1'b0;
+
         case (status)
             st_idle: begin
-                
-                
-
-                if (handshake != hs_ack)
+                if (setup_data_ready && transaction_active) begin
+                    setup_data_toggle <= ~setup_data_toggle;
+                end
+                if (handshake != hs_ack) // TODO FIX ME
                     handshake <= hs_ack;
                 if (!setup_data_ready && !usb_recv_queue_empty) begin // collect setup data
-                    if (!usb_recv_queue_r_en) begin 
+                    if (!usb_recv_queue_r_en) begin
                         usb_recv_queue_r_en <= 1'b1 ;
                     end
                     else begin
                         bytes_in[got_bytes] <= usb_recv_queue_data_out;
                         got_bytes <= got_bytes + 1'b1;
                     end
-                        
+
                 end
                 else if (!setup_data_ready && got_bytes == 7 ) begin
                     setup_in <= bytes_in[0][7];
                     setup_response();
                     setup_data_ready <= 1'b1;
                     bytes_counter <= 8'h00;
-                    usb_recv_queue_r_en <= 1'b0; 
+                    usb_recv_queue_r_en <= 1'b0;
                 end
                 if (bytes_counter < expected_bytes) begin
                     if (~usb_send_queue_w_en) begin
@@ -166,6 +166,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                     end
                     usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
                     bytes_counter <= bytes_counter + 1'b1;
+                    if (bytes_counter + 1'b1 == expected_bytes) usb_send_queue_w_en <= 1'b0;
 
                 end
             end
@@ -179,15 +180,12 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 if (usb_send_queue_empty) begin
                     setup_data_toggle <= 1'b1;
                 end
-                if (!transaction_active) begin
-                    setup_data_toggle <= ~setup_data_toggle;
-                end
 
             end
         endcase
         if (control_transaction_finished ) begin
             setup_data_ready <= 0;
-            setup_data_toggle <= 1'b1;
+            setup_data_toggle <= 1'b0;
             got_bytes <= 0;
         end
     end
