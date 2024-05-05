@@ -1,7 +1,6 @@
-module usb_setup(rst, usb_rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv_queue_r_en, transaction_active, usb_recv_queue_data_out, usb_recv_queue_empty, usb_send_queue_w_en, usb_send_queue_data_in, usb_send_queue_empty, control_transaction_finished, usb_addr_temp);
+module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv_queue_r_en, transaction_active, usb_recv_queue_data_out, usb_recv_queue_empty, usb_send_queue_w_en, usb_send_queue_data_in, usb_send_queue_empty, control_transaction_finished, usb_addr_temp);
 
     input rst ;
-    input usb_rst;
     input clk;
     input [1:0]status;
     input transaction_active;
@@ -38,7 +37,6 @@ module usb_setup(rst, usb_rst, clk, status, setup_data_ready, setup_data_toggle,
     reg [7:0] bytes_in [0:128];
     reg [7:0] got_bytes = 0;
 
-    // reg setup_in = 0;
     reg [1:0]setup_handshake = hs_ack;
     reg setup_data_ready = 0;
     reg setup_data_toggle = 0;
@@ -50,10 +48,10 @@ module usb_setup(rst, usb_rst, clk, status, setup_data_ready, setup_data_toggle,
     assign usb_send_queue_data_in = r_usb_send_queue_data_in;
     reg [6:0]r_usb_addr_temp = 0;
     assign usb_addr_temp = r_usb_addr_temp;
+    reg [7:0] got_bytes1 ;
     always @(posedge clk) begin
-        if (!rst | usb_rst ) begin
+        if (rst ) begin
             r_usb_recv_queue_r_en <= 1'b0;
-            // setup_in <= 0;
             r_usb_addr_temp <= 0;
             // handshake <= hs_ack;
             setup_data_toggle <= 1'b0;
@@ -61,25 +59,24 @@ module usb_setup(rst, usb_rst, clk, status, setup_data_ready, setup_data_toggle,
             setup_data_ready <= 1'b0;
         end
 
-
+        got_bytes1 <= got_bytes;
         case (status)
             st_idle: begin
                 if (setup_data_ready && transaction_active) begin
                     setup_data_toggle <= ~setup_data_toggle;
                 end
-                // if (handshake != hs_ack) // TODO FIX ME
-                //     handshake <= hs_ack;
+                bytes_in[got_bytes1] <= usb_recv_queue_data_out;
                 if (!setup_data_ready && !usb_recv_queue_empty) begin // collect setup data
                     if (!r_usb_recv_queue_r_en) begin
                         r_usb_recv_queue_r_en <= 1'b1 ;
                     end
                     else begin
-                        bytes_in[got_bytes] <= usb_recv_queue_data_out;
+                        
                         got_bytes <= got_bytes + 1'b1;
                     end
-
+                
                 end
-                else if (!setup_data_ready && got_bytes == 7 ) begin
+                else if (!setup_data_ready && got_bytes == 8 ) begin
                     // setup_in <= bytes_in[0][7];
                     setup_response();
                     setup_data_ready <= 1'b1;
@@ -90,10 +87,14 @@ module usb_setup(rst, usb_rst, clk, status, setup_data_ready, setup_data_toggle,
                     if (~r_usb_send_queue_w_en) begin
                         r_usb_send_queue_w_en <= 1'b1;
                     end
-
                     bytes_counter <= bytes_counter + 1'b1;
-                    if (bytes_counter + 1'b1 == expected_bytes) r_usb_send_queue_w_en <= 1'b0;
+                    if (bytes_counter + 1'b1 == expected_bytes) begin
+                    end
 
+                end
+                else if (bytes_counter >= expected_bytes) begin
+                    
+                        r_usb_send_queue_w_en <= 1'b0;
                 end
                 r_usb_send_queue_data_in <= configuration[config_offset+bytes_counter];
             end
@@ -174,32 +175,26 @@ module usb_setup(rst, usb_rst, clk, status, setup_data_ready, setup_data_toggle,
             case (bytes_in[1]) // bRequest
                 8'h30: begin
                     expected_bytes <= 0;
-                    // from_descriptor <= 0;
                 end
                 8'h31: begin
                     expected_bytes <= bytes_in[6];
                     config_offset <= 47;
-                    // from_descriptor <= 0;
                 end
                 8'h00: begin // get status
                     config_offset <= 137;
                     expected_bytes <= 2;
-                    // from_descriptor <= 1;
                 end
                 8'h05: begin //set address
 
                     r_usb_addr_temp <= bytes_in[2][6:0];
                     expected_bytes <= 0;
-                    // from_descriptor <= 1;
                 end
                 8'h06: begin // get  descriptor
                     {expected_bytes, config_offset} <= get_descriptor_offset(bytes_in[03], bytes_in[02], bytes_in[6]);
-                    // from_descriptor <= 1;
 
                 end
                 default: begin
                     expected_bytes <= 0;
-                    // from_descriptor <= 1;
                 end
             endcase
         end

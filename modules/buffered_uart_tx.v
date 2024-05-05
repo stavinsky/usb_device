@@ -31,7 +31,10 @@ module buffered_uart_tx(uart_tx, clk, data, data_valid, full, rst );
               .r_clk(q_r_clk),
               .w_clk(data_valid_loc),
               .full(full),
-              .rst(rst)
+              .rst(rst),
+              .r_en(1'b1),
+              .w_en(1'b1)
+
 
           );
 

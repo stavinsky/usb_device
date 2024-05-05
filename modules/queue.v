@@ -1,4 +1,4 @@
-module queue #(parameter size = 256) (r_clk, data_out, w_clk, data_in, empty, full, rst);
+module queue #(parameter size = 256) (r_clk, data_out, w_clk, data_in, empty, full, rst, r_en, w_en);
     input wire r_clk;
     output [7:0]data_out;
 
@@ -8,6 +8,8 @@ module queue #(parameter size = 256) (r_clk, data_out, w_clk, data_in, empty, fu
     output empty;
     output full;
     input rst;
+    input r_en;
+    input w_en; 
 
     localparam adr_size = $clog2(size) -1 ;
     (* ram_style = "block" *)
@@ -18,17 +20,21 @@ module queue #(parameter size = 256) (r_clk, data_out, w_clk, data_in, empty, fu
     
     assign data_out = r_data_out;
 
-    always @(posedge r_clk) begin
-        if (~rst) r_address <= 0;
-        if (~empty) begin
+    always @(posedge r_clk or negedge rst) begin
+        if (~rst) begin 
+            r_address <= 0; 
+        end
+        else if (~empty && r_en) begin
             r_data_out <= mem[r_address];
             r_address <= r_address + 1'b1;
         end
     end
 
-    always @(posedge w_clk ) begin
-        if (~rst) w_address <= 0;
-        if (~full) begin
+    always @(posedge w_clk or negedge rst) begin
+        if (~rst) begin  
+            w_address <= 0;
+        end
+        else if  (~full && w_en) begin
             mem[w_address] <= data_in;
             w_address <= w_address + 1'b1;
         end

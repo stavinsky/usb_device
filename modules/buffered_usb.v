@@ -20,7 +20,6 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     reg data_in_valid = 0;
     reg [7:0] uart_counter = 0;
     reg [6:0] bytes_out_counter = 0;
-    reg data_strobe_loc = 0;
     reg transaction_loc = 0;
     reg setup_toggle = 0;
 
@@ -50,42 +49,43 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         uart_tx1_data = (direction_in) ? data_in : data_out;
     end
 
-
-
-    wire usb_recv_queue_w_clk;
     wire usb_recv_queue_empty;
     wire [7:0]usb_recv_queue_data_out;
-    reg  usb_recv_queue_r_clk ;
     wire usb_recv_queue_r_en;
-    always @* begin
-        usb_recv_queue_r_clk = (usb_recv_queue_r_en)? clk : 1'b0;
-    end
-    assign usb_recv_queue_w_clk = (direction_in) ?  1'b0 : data_strobe_loc;
-
-    queue usb_recv_queue ( .r_clk(usb_recv_queue_r_clk), .data_out(usb_recv_queue_data_out), .w_clk(usb_recv_queue_w_clk), .data_in(data_out), .empty(usb_recv_queue_empty), .full(), .rst(rst));
-    buffered_uart_tx uart_tx1 ( .uart_tx(uart_tx), .clk(clk), .data(uart_tx1_data), .data_valid(data_strobe), .full(), .rst(rst));
-
-    wire usb_send_queue_r_clk;
-    reg usb_send_queue_w_clk;
     wire usb_send_queue_w_en;
+    queue usb_recv_queue ( 
+        .r_clk(clk), 
+        .data_out(usb_recv_queue_data_out), 
+        .w_clk(data_strobe), 
+        .data_in(data_out), 
+        .empty(usb_recv_queue_empty), 
+        .full(), 
+        .rst(rst),
+        .r_en(usb_recv_queue_r_en),
+        .w_en(~direction_in)
+        );
     wire usb_send_queue_empty;
     wire [7:0]usb_send_queue_data_in;
     reg write_first_byte = 0;
-    assign usb_send_queue_r_clk = (direction_in) ? (data_strobe_loc  | write_first_byte): 1'b0;
-    always @* begin
-        usb_send_queue_w_clk = (usb_send_queue_w_en)? clk : 1'b0;
-    end
-
-   
-
+    queue usb_send_queue (
+        .r_clk((data_strobe | write_first_byte)), 
+        .data_out(data_in), 
+        .w_clk(clk), 
+        .data_in(usb_send_queue_data_in), 
+        .empty(usb_send_queue_empty), 
+        .full(), 
+        .rst(rst),
+        .r_en(direction_in),
+        .w_en(usb_send_queue_w_en)
+    );
+    buffered_uart_tx uart_tx1 ( .uart_tx(uart_tx), .clk(clk), .data(uart_tx1_data), .data_valid(data_strobe), .full(), .rst(rst));
 
     wire setup_data_ready;
     wire setup_data_toggle;
     wire [6:0] usb_addr_temp;
     reg control_transaction_finished = 1'b1;
     usb_setup usb_setup1(
-        .rst(rst), 
-        .usb_rst(usb_rst), 
+        .rst(~rst || usb_rst ), 
         .clk(clk), 
         .status(status), 
         .setup_data_ready(setup_data_ready), 
@@ -131,15 +131,8 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
               .tx_j(usb_tx_j),
               .tx_en(usb_tx_en)
             );
-    ///// setup recv
-    queue usb_send_queue (.r_clk(usb_send_queue_r_clk), .data_out(data_in), .w_clk(usb_send_queue_w_clk), .data_in(usb_send_queue_data_in), .empty(usb_send_queue_empty), .full(), .rst(rst));
-    ////// /setup recv
-    always @(posedge clk) begin
 
-        data_strobe_loc <= data_strobe;
-        transaction_loc <= transaction_active;
-    end
-    
+
     reg [7:0]counter = 0;
     reg write_last_byte = 0;
     always @(posedge clk) begin
@@ -174,14 +167,17 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                         data_in_valid <= 1'b1;
                     end
                 end
-                else if (!write_last_byte && data_strobe_loc) begin  // TODO: Fix ME
+                else if (!write_last_byte && data_strobe) begin  // TODO: Fix ME
                     write_last_byte <= 1'b1;
                 end
-                else if (data_in_valid &&  data_strobe_loc) begin
+                else if (write_last_byte &&   data_strobe) begin
                     data_in_valid <= 1'b0;
                     write_last_byte <= 1'b0;
                 end
-                if (data_strobe_loc) begin
+                else if (data_in_valid && data_strobe)begin
+                    data_in_valid = 1'b0;
+                end
+                if (data_strobe) begin
                     counter <= counter + 1'b1;
                 end
                 if (~transaction_active) begin
@@ -193,7 +189,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 end
             end
             st_get_data: begin
-                if (data_strobe_loc) begin
+                if (data_strobe) begin
                     counter <= counter + 1'b1;
                 end
                 if (~transaction_active) begin
@@ -206,7 +202,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             end
 
         endcase
-        if (!rst | usb_rst ) begin
+        if (~rst | usb_rst ) begin
             status <= st_idle;
             usb_address <= 0;
             data_toggle <= 0;
