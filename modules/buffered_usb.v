@@ -66,9 +66,8 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         );
     wire usb_send_queue_empty;
     wire [7:0]usb_send_queue_data_in;
-    reg write_first_byte = 0;
     queue usb_send_queue (
-        .r_clk((data_strobe | write_first_byte)), 
+        .r_clk(data_strobe), 
         .data_out(data_in), 
         .w_clk(clk), 
         .data_in(usb_send_queue_data_in), 
@@ -134,7 +133,6 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
 
 
     reg [7:0]counter = 0;
-    reg write_last_byte = 0;
     always @(posedge clk) begin
         data_toggle <= setup_data_toggle;
         case (status)
@@ -160,22 +158,11 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
                 end
             end
             st_send_data: begin
-                write_first_byte <= 1'b0; // TODO fix me
                 if (!usb_send_queue_empty)begin
-                    if (!write_first_byte && !data_in_valid ) begin
-                        write_first_byte <= 1'b1;
                         data_in_valid <= 1'b1;
-                    end
-                end
-                else if (!write_last_byte && data_strobe) begin  // TODO: Fix ME
-                    write_last_byte <= 1'b1;
-                end
-                else if (write_last_byte &&   data_strobe) begin
-                    data_in_valid <= 1'b0;
-                    write_last_byte <= 1'b0;
                 end
                 else if (data_in_valid && data_strobe)begin
-                    data_in_valid = 1'b0;
+                    data_in_valid <= 1'b0;
                 end
                 if (data_strobe) begin
                     counter <= counter + 1'b1;
@@ -207,7 +194,6 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             usb_address <= 0;
             data_toggle <= 0;
             setup_toggle <= 0;
-            write_first_byte <= 0;
             counter <= 0;
             handshake <= hs_ack;
         end

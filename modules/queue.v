@@ -16,16 +16,14 @@ module queue #(parameter size = 256) (r_clk, data_out, w_clk, data_in, empty, fu
     reg [7:0] mem [0:size-1];
     reg [adr_size:0] r_address = 0;
     reg [adr_size:0] w_address = 0;
-    reg [7:0]r_data_out = 0;
     
-    assign data_out = r_data_out;
+    assign data_out = mem[r_address];
 
     always @(posedge r_clk or negedge rst) begin
         if (~rst) begin 
             r_address <= 0; 
         end
         else if (~empty && r_en) begin
-            r_data_out <= mem[r_address];
             r_address <= r_address + 1'b1;
         end
     end

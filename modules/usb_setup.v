@@ -48,7 +48,6 @@ module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv
     assign usb_send_queue_data_in = r_usb_send_queue_data_in;
     reg [6:0]r_usb_addr_temp = 0;
     assign usb_addr_temp = r_usb_addr_temp;
-    reg [7:0] got_bytes1 ;
     always @(posedge clk) begin
         if (rst ) begin
             r_usb_recv_queue_r_en <= 1'b0;
@@ -59,13 +58,12 @@ module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv
             setup_data_ready <= 1'b0;
         end
 
-        got_bytes1 <= got_bytes;
         case (status)
             st_idle: begin
                 if (setup_data_ready && transaction_active) begin
                     setup_data_toggle <= ~setup_data_toggle;
                 end
-                bytes_in[got_bytes1] <= usb_recv_queue_data_out;
+                bytes_in[got_bytes] <= usb_recv_queue_data_out;
                 if (!setup_data_ready && !usb_recv_queue_empty) begin // collect setup data
                     if (!r_usb_recv_queue_r_en) begin
                         r_usb_recv_queue_r_en <= 1'b1 ;
