@@ -15,7 +15,7 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
     reg usb_dn_sync;
     wire usb_rst; // set to 1 if usb device got reset from the host
     reg [6:0] usb_address;
-    reg [1:0] handshake = 2'b00;
+    wire [1:0] handshake ;
     wire [7:0] data_in;
     reg data_in_valid = 0;
     reg [7:0] uart_counter = 0;
@@ -97,7 +97,8 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
         .usb_send_queue_data_in(usb_send_queue_data_in), 
         .usb_send_queue_empty(usb_send_queue_empty), 
         .control_transaction_finished(control_transaction_finished), 
-        .usb_addr_temp(usb_addr_temp)
+        .usb_addr_temp(usb_addr_temp),
+        .handshake(handshake)
     );
 
     always @(posedge clk) begin
@@ -195,7 +196,6 @@ module buffered_usb(clk, usb_dp, usb_dn, rst, uart_tx);
             data_toggle <= 0;
             setup_toggle <= 0;
             counter <= 0;
-            handshake <= hs_ack;
         end
     end
 

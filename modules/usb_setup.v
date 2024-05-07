@@ -1,4 +1,4 @@
-module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv_queue_r_en, transaction_active, usb_recv_queue_data_out, usb_recv_queue_empty, usb_send_queue_w_en, usb_send_queue_data_in, usb_send_queue_empty, control_transaction_finished, usb_addr_temp);
+module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv_queue_r_en, transaction_active, usb_recv_queue_data_out, usb_recv_queue_empty, usb_send_queue_w_en, usb_send_queue_data_in, usb_send_queue_empty, control_transaction_finished, usb_addr_temp, handshake);
 
     input rst ;
     input clk;
@@ -14,6 +14,8 @@ module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv
     input usb_send_queue_empty;
     input control_transaction_finished;
     output [6:0] usb_addr_temp;
+    output [1:0]handshake; 
+
     localparam
         hs_ack = 2'b00,
         hs_none = 2'b01,
@@ -48,6 +50,12 @@ module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv
     assign usb_send_queue_data_in = r_usb_send_queue_data_in;
     reg [6:0]r_usb_addr_temp = 0;
     assign usb_addr_temp = r_usb_addr_temp;
+    reg setup_error;
+    assign handshake = setup_handshake;
+    always @* begin
+        //TODO check if recv_queue is full, than hs_nak
+        setup_handshake = setup_data_ready && setup_error? hs_stall : hs_ack;
+    end
     always @(posedge clk) begin
         if (rst ) begin
             r_usb_recv_queue_r_en <= 1'b0;
@@ -116,60 +124,61 @@ module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv
         end
     end
 
-    function automatic [15:0] get_descriptor_offset;
+    function automatic [16:0] get_descriptor_offset;
         input [7:0] descriptor_type;
         input [7:0] requested_offset;
         input [7:0] requested_size;
 
         begin
-            setup_handshake = hs_ack;
+            
             case (descriptor_type) //wValue [1]
                 8'h01: begin //get device descriptor
-                    get_descriptor_offset = {configuration[0], 8'h00};
+                    get_descriptor_offset = {1'b0,configuration[0], 8'h00};
                 end
                 8'h02: begin // get configuration descriptor
-                    get_descriptor_offset = {requested_size, 8'd18};
+                    get_descriptor_offset = {1'b0,requested_size, 8'd18};
 
                 end
                 8'h03: begin // string descriptors
                     get_descriptor_offset = string_offset(requested_offset);
                 end
                 default: begin
-                    get_descriptor_offset = {8'h00, 8'h00};
+                    get_descriptor_offset = {1'b1,8'h00, 8'h00};
                     // setup_handshake = hs_stall;
                 end
             endcase
         end
     endfunction
-    function automatic [15:0] string_offset;
+    function automatic [16:0] string_offset;
         input [7:0] requested_offset;
-
+        
         begin
+           
             case (requested_offset) //wValue [0]
                 8'h00:begin //string configuration
-                    string_offset = {configuration[43], 8'd43};
+                    string_offset = {1'b0,configuration[43], 8'd43};
                 end
                 8'haa:begin // manufacturer
-                    string_offset = {configuration[47], 8'd47};
+                    string_offset = {1'b0,configuration[47], 8'd47};
                 end
                 8'hab:begin // device name
-                    string_offset = {configuration[73], 8'd73};
+                    string_offset = {1'b0,configuration[73], 8'd73};
                 end
                 8'hac:begin // serial number
-                    string_offset = {configuration[47], 8'd47};
+                    string_offset = {1'b0,configuration[47], 8'd47};
                 end
                 8'had:begin // interface 0 str
-                    string_offset = {configuration[101], 8'd101};
+                    string_offset = {1'b0,configuration[101], 8'd101};
                 end
                 default:begin
-                    string_offset = {8'd0, 8'd0};
+                    string_offset = {1'b1,8'd0, 8'd0};
                 end
             endcase
         end
     endfunction
     task setup_response();
         begin
-
+            setup_error <= 0;
             case (bytes_in[1]) // bRequest
                 8'h30: begin
                     expected_bytes <= 0;
@@ -188,11 +197,17 @@ module usb_setup(rst, clk, status, setup_data_ready, setup_data_toggle, usb_recv
                     expected_bytes <= 0;
                 end
                 8'h06: begin // get  descriptor
-                    {expected_bytes, config_offset} <= get_descriptor_offset(bytes_in[03], bytes_in[02], bytes_in[6]);
-
+                    {setup_error, expected_bytes, config_offset} <= get_descriptor_offset(bytes_in[03], bytes_in[02], bytes_in[6]);
+                    if (expected_bytes == 0 && config_offset == 0) begin
+                        // setup_handshake <= hs_stall;
+                    end
+                end
+                8'h09: begin // set config
+                    expected_bytes <= 0;
                 end
                 default: begin
                     expected_bytes <= 0;
+                    setup_error <= 1'b1;
                 end
             endcase
         end
