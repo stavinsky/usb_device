@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
 ~/build/IDE/bin/gw_sh scripts/build.tcl
-openFPGALoader -b tangnano9k impl/pnr/project.fs -r 
+openFPGALoader -b tangnano9k impl/pnr/project.fs  
