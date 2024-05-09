@@ -4,10 +4,10 @@ module power_on_reset(clk, rst_in, rst_out);
     input rst_in;
     output rst_out;
     reg started =0;
-
-    reg [$clog2(1000)-1:0] start_counter = 0;
+    localparam delay = 100000;
+    reg [$clog2(delay)-1:0] start_counter = 0;
     always @(posedge clk) begin
-        if (start_counter < 1000) begin
+        if (start_counter < delay) begin
             start_counter <= start_counter + 1'b1;
         end
         else begin
